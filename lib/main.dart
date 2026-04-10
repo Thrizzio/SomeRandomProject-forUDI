@@ -5,6 +5,10 @@ import 'package:android_sms_reader/android_sms_reader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'tax-intelligence/formatter.dart';
+import 'tax-intelligence/tax_Engine.dart';
+import 'tax-intelligence/suggestion_Engine.dart';
+
 const MethodChannel _platformChannel = MethodChannel(
   'sms_parser_basically/device_settings',
 );
@@ -85,6 +89,29 @@ final class SmsReader {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final TaxResult result = TaxEngine.calculate(800000);
+
+  print('Taxable Income: ${result.taxableIncome}');
+  print('Tax Payable: ${result.taxPayable}');
+
+  final List<String> suggestions = SuggestionEngine.generate(
+    totalIncome: result.totalIncome,
+    taxableIncome: result.taxableIncome,
+    taxPayable: result.taxPayable,
+  );
+
+  print(suggestions);
+
+  final String summary = Formatter.generateSummary(
+    totalIncome: result.totalIncome,
+    taxableIncome: result.taxableIncome,
+    taxPayable: result.taxPayable,
+    suggestions: suggestions,
+  );
+
+  print(summary);
+
   runApp(const GigIncomeApp());
 }
 
