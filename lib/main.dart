@@ -1,8 +1,5 @@
-import 'dart:async';
-import 'dart:io';
-
-import 'package:android_sms_reader/android_sms_reader.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter/services.dart';
 
 const MethodChannel _platformChannel = MethodChannel(
@@ -47,69 +44,43 @@ typedef SmsMessage = AndroidSMSMessage;
 
 final class SmsReader {
   SmsReader._();
-
-  static Future<bool> requestPermissions() async {
-    final bool alreadyGranted = await AndroidSMSReader.requestPermissions();
-    if (alreadyGranted) {
-      return true;
-    }
-
-    if (!Platform.isAndroid) {
-      return false;
-    }
-
-    try {
-      return await _platformChannel.invokeMethod<bool>(
-            'requestSmsPermissions',
-          ) ??
-          false;
-    } on MissingPluginException {
-      return false;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  static Future<List<SmsMessage>> fetchMessages({
-    required SmsType type,
-    int start = 0,
-    int count = 50,
-  }) {
-    return AndroidSMSReader.fetchMessages(
-      type: type,
-      start: start,
-      count: count,
-    );
-  }
-
-  static Stream<SmsMessage> observeIncomingMessages() {
-    return _liveSmsChannel.receiveBroadcastStream().map((dynamic event) {
-      return SmsMessage.fromJson(Map<String, dynamic>.from(event as Map));
-    });
-  }
 }
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const GigIncomeApp());
+void main() {
+  runApp(const MyApp());
 }
 
-class GigIncomeApp extends StatelessWidget {
-  const GigIncomeApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Gig Income SMS',
+      title: 'Flutter Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        // This is the theme of your application.
+        //
+        // TRY THIS: Try running your application with "flutter run". You'll see
+        // the application has a purple toolbar. Then, without quitting the app,
+        // try changing the seedColor in the colorScheme below to Colors.green
+        // and then invoke "hot reload" (save your changes or press the "hot
+        // reload" button in a Flutter-supported IDE, or press "r" if you used
+        // the command line to start the app).
+        //
+        // Notice that the counter didn't reset back to zero; the application
+        // state is not lost during the reload. To reset the state, use hot
+        // restart instead.
+        //
+        // This works for code too, not just values: Most code changes can be
+        // tested with just a hot reload.
+        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const IncomeSmsPage(),
+      home: const ReadSmsScreen(),
     );
   }
 }
+
 
 class IncomeSmsPage extends StatefulWidget {
   const IncomeSmsPage({super.key});
@@ -729,3 +700,4 @@ class _EmptyMatchesView extends StatelessWidget {
     );
   }
 }
+
