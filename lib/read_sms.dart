@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
 import 'package:intl/intl.dart';
-import 'tax-intelligence/index.dart'; // adjust path if needed
+import 'tax-intelligence/index.dart';
+import 'widgets/transaction_card.dart';
+import 'widgets/tax_health_card.dart';
+import 'widgets/suggestion_card.dart';
+import 'widgets/income_summary_card.dart';
+import 'theme/app_spacing.dart';
 
 // --- Model ---
 
@@ -155,6 +160,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+<<<<<<< Updated upstream
       appBar: AppBar(title: const Text("Gig Income Tracker")),
       body: Column(
         children: [
@@ -183,142 +189,201 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+=======
+      appBar: AppBar(
+        title: const Text("Gig Income Tracker"),
+        actions: widget.appBarActions,
+      ),
+      body: _incomes.isEmpty
+          ? _buildEmptyState()
+          : SingleChildScrollView(
+              child: Column(
+>>>>>>> Stashed changes
                 children: [
-                  Text("Total Income (${_incomes.length} entries)",
-                      style:
-                          const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    "₹${_numFmt.format(_totalIncome)}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.green,
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      children: [
+                        // Test buttons for demo
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _testBtn(
+                                "Swiggy ₹850",
+                                "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              _testBtn(
+                                "Zomato ₹1200",
+                                "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              _testBtn(
+                                "Uber ₹450",
+                                "Rs. 450 deposited to your a/c. Uber earnings settlement.",
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        // Income summary
+                        IncomeSummaryCard(
+                          count: _incomes.length,
+                          total: _totalIncome,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        // Recent transactions header
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Recent Transactions',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        // Transaction list
+                        ..._incomes.take(5).map((income) {
+                          return Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: TransactionCard(
+                              source: income.source,
+                              amount: income.amount,
+                              date: income.date,
+                            ),
+                          );
+                        }),
+                        if (_incomes.length > 5) ...[const SizedBox(height: AppSpacing.lg)],
+                      ],
                     ),
+                  ),
+                  // Tax section
+                  if (_taxResult != null) ...[_buildTaxSection(_taxResult!)],
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.mail_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'No income tracked yet',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'We\'ll monitor your SMS and automatically detect income deposits.',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Or test with sample transactions:',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _testBtn(
+                    "Add Swiggy",
+                    "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _testBtn(
+                    "Add Zomato",
+                    "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
                   ),
                 ],
               ),
             ),
-
-          // ── Income table ──────────────────────────────────────────
-          if (_incomes.isEmpty)
-            const Expanded(
-              child: Center(child: Text("Waiting for gig income SMS...")),
-            )
-          else
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                        Colors.grey.shade100),
-                    columns: const [
-                      DataColumn(label: Text("#")),
-                      DataColumn(label: Text("Source")),
-                      DataColumn(
-                          label: Text("Amount"), numeric: true),
-                      DataColumn(label: Text("Date & Time")),
-                    ],
-                    rows: _incomes.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final income = entry.value;
-                      return DataRow(cells: [
-                        DataCell(Text("${i + 1}")),
-                        DataCell(Text(income.source)),
-                        DataCell(Text(
-                            "₹${_numFmt.format(income.amount)}")),
-                        DataCell(
-                            Text(_dateFmt.format(income.date))),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-
-          // ── Tax panel ─────────────────────────────────────────────
-          if (_taxResult != null) _buildTaxPanel(_taxResult!),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _testBtn(String label, String sms) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ElevatedButton(
-        onPressed: () => _injectTestSms(sms),
-        child: Text(label),
-      ),
-    );
-  }
-
-  Widget _buildTaxPanel(TaxIntelligenceResult result) {
+  Widget _buildTaxSection(TaxIntelligenceResult result) {
     return Container(
-      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        border: Border(top: BorderSide(color: Colors.blue.shade200)),
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          ),
+        ),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Tax Summary (Section 44ADA)",
-              style:
-                  TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 8),
-          _taxRow("Total Income",
-              "₹${_numFmt.format(result.totalIncome)}"),
-          _taxRow("Taxable Income (50%)",
-              "₹${_numFmt.format(result.taxableIncome)}"),
-          _taxRow(
-            "Est. Tax Payable",
-            "₹${_numFmt.format(result.taxPayable)}",
-            highlight: true,
+          TaxHealthCard(
+            grossIncome: result.totalIncome,
+            taxableIncome: result.taxableIncome,
+            taxPayable: result.taxPayable,
           ),
-          if (result.suggestions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Text("💡 Suggestions",
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            ...result.suggestions.map(
-              (s) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("• "),
-                    Expanded(child: Text(s)),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          if (result.suggestions.isNotEmpty) ...[const SizedBox(height: AppSpacing.lg)],
+          if (result.suggestions.isNotEmpty) ...[_buildSuggestionsSection(result)],
         ],
       ),
     );
   }
 
-  Widget _taxRow(String label, String value,
-      {bool highlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight:
-                  highlight ? FontWeight.bold : FontWeight.normal,
-              color: highlight ? Colors.red.shade700 : null,
+  Widget _buildSuggestionsSection(TaxIntelligenceResult result) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tips & Recommendations',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        ...result.suggestions.map((suggestion) {
+          final type = _getSuggestionType(suggestion);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: SuggestionCard(
+              suggestion: suggestion,
+              type: type,
             ),
-          ),
-        ],
-      ),
+          );
+        }),
+      ],
+    );
+  }
+
+  SuggestionType _getSuggestionType(String suggestion) {
+    final lower = suggestion.toLowerCase();
+    if (lower.contains('rebate') ||
+        lower.contains('eligible') ||
+        lower.contains('zero')) {
+      return SuggestionType.positive;
+    }
+    if (lower.contains('advance') ||
+        lower.contains('warning') ||
+        lower.contains('high')) {
+      return SuggestionType.warning;
+    }
+    return SuggestionType.info;
+  }
+
+  Widget _testBtn(String label, String sms) {
+    return ElevatedButton(
+      onPressed: () => _injectTestSms(sms),
+      child: Text(label),
     );
   }
 }
