@@ -1,6 +1,6 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide Transaction;
 import 'package:path/path.dart';
-import 'transaction.dart';
+import '../models/transaction.dart';
 
 class DatabaseService {
   static const String _dbName = 'sms_transactions.db';

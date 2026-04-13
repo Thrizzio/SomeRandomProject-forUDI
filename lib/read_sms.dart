@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
 import 'package:intl/intl.dart';
+
 import 'tax-intelligence/index.dart';
 import 'widgets/transaction_card.dart';
 import 'widgets/tax_health_card.dart';
 import 'widgets/suggestion_card.dart';
 import 'widgets/income_summary_card.dart';
 import 'theme/app_spacing.dart';
+import 'services/database_service.dart';
+import 'models/transaction.dart' as app_models;
 
 // --- Model ---
 
@@ -59,9 +62,10 @@ class SmsParser {
     final patterns = [
       RegExp(r'₹\s?([\d,]+(?:\.\d{1,2})?)'),
       RegExp(r'inr\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'rs\.?\s?([\d,]+)', caseSensitive: false),
+      RegExp(r'rs\.?\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
     ];
-    for (var regex in patterns) {
+
+    for (final regex in patterns) {
       final match = regex.firstMatch(text);
       if (match != null) {
         final raw = match.group(1)!.replaceAll(",", "");
@@ -90,10 +94,13 @@ class SmsParser {
   static ParsedIncome? parse(SmsMessage message) {
     final body = message.body ?? "";
     if (!isValidGigIncome(body)) return null;
+
     final amount = extractAmount(body);
     if (amount == null) return null;
+
     final date = extractDate(message);
     if (date == null) return null;
+
     return ParsedIncome(
       amount: amount,
       source: extractSource(body),
@@ -127,24 +134,106 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
-  void _onNewIncome(ParsedIncome income) {
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedTransactions();
+    startListening();
+  }
+
+  Future<void> _loadSavedTransactions() async {
+    try {
+      final transactions =
+          await DatabaseService.getTransactionsByType('income');
+
+      final loadedIncomes = transactions.map((t) {
+        return ParsedIncome(
+          amount: _parseAmountString(t.amount),
+          source: t.sender,
+          date: t.date,
+        );
+      }).toList();
+
+      loadedIncomes.sort((a, b) => b.date.compareTo(a.date));
+
+      if (!mounted) return;
+
+      setState(() {
+        _incomes
+          ..clear()
+          ..addAll(loadedIncomes);
+
+        _taxResult = _incomes.isEmpty
+            ? null
+            : TaxIntelligence.analyze(_totalIncome);
+      });
+    } catch (e) {
+      debugPrint('Failed to load saved transactions: $e');
+    }
+  }
+
+  double _parseAmountString(String value) {
+    return double.tryParse(
+          value.replaceAll(',', '').replaceAll('₹', '').trim(),
+        ) ??
+        0.0;
+  }
+
+  Future<void> _saveIncomeToDatabase(ParsedIncome income,
+      {String messageBody = 'Parsed SMS income'}) async {
+    try {
+      await DatabaseService.insertTransaction(
+        app_models.Transaction(
+          amount: income.amount.toString(),
+          sender: income.source,
+          messageBody: messageBody,
+          transactionType: 'income',
+          date: income.date,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to save transaction: $e');
+    }
+  }
+
+  Future<void> _onNewIncome(ParsedIncome income,
+      {String messageBody = 'Parsed SMS income'}) async {
     setState(() {
-      _incomes.insert(0, income);
+      final alreadyExists = _incomes.any(
+        (item) =>
+            item.amount == income.amount &&
+            item.source == income.source &&
+            item.date.millisecondsSinceEpoch ==
+                income.date.millisecondsSinceEpoch,
+      );
+
+      if (!alreadyExists) {
+        _incomes.insert(0, income);
+        _incomes.sort((a, b) => b.date.compareTo(a.date));
+      }
+
       _taxResult = TaxIntelligence.analyze(_totalIncome);
     });
+
+    await _saveIncomeToDatabase(income, messageBody: messageBody);
   }
 
   void startListening() {
     telephony.listenIncomingSms(
-      onNewMessage: (SmsMessage message) {
+      onNewMessage: (SmsMessage message) async {
         final parsed = SmsParser.parse(message);
-        if (parsed != null) _onNewIncome(parsed);
+        if (parsed != null) {
+          await _onNewIncome(
+            parsed,
+            messageBody: message.body ?? 'Parsed SMS income',
+          );
+        }
       },
       listenInBackground: false,
     );
   }
 
-  void _injectTestSms(String body) {
+  Future<void> _injectTestSms(String body) async {
     final amount = SmsParser.extractAmount(body);
     if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -153,19 +242,14 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       return;
     }
 
-    _onNewIncome(
+    await _onNewIncome(
       ParsedIncome(
         amount: amount,
         source: SmsParser.extractSource(body),
         date: DateTime.now(),
       ),
+      messageBody: body,
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    startListening();
   }
 
   @override
