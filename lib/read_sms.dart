@@ -96,7 +96,12 @@ class SmsParser {
 // --- Screen ---
 
 class ReadSmsScreen extends StatefulWidget {
-  const ReadSmsScreen({super.key});
+  const ReadSmsScreen({
+    super.key,
+    this.appBarActions,
+  });
+
+  final List<Widget>? appBarActions;
 
   @override
   State<ReadSmsScreen> createState() => _ReadSmsScreenState();
@@ -155,7 +160,10 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Gig Income Tracker")),
+      appBar: AppBar(
+        title: const Text("Gig Income Tracker"),
+        actions: widget.appBarActions,
+      ),
       body: Column(
         children: [
           // ── Test buttons (emulator only) ──────────────────────────
