@@ -101,7 +101,12 @@ class SmsParser {
 // --- Screen ---
 
 class ReadSmsScreen extends StatefulWidget {
-  const ReadSmsScreen({super.key});
+  const ReadSmsScreen({
+    super.key,
+    this.appBarActions,
+  });
+
+  final List<Widget>? appBarActions;
 
   @override
   State<ReadSmsScreen> createState() => _ReadSmsScreenState();
@@ -160,8 +165,10 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-<<<<<<< Updated upstream
-      appBar: AppBar(title: const Text("Gig Income Tracker")),
+      appBar: AppBar(
+        title: const Text("Gig Income Tracker"),
+        actions: widget.appBarActions,
+      ),
       body: Column(
         children: [
           // ── Test buttons (emulator only) ──────────────────────────
@@ -189,7 +196,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-=======
+
       appBar: AppBar(
         title: const Text("Gig Income Tracker"),
         actions: widget.appBarActions,
@@ -198,7 +205,6 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
           ? _buildEmptyState()
           : SingleChildScrollView(
               child: Column(
->>>>>>> Stashed changes
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(AppSpacing.lg),
