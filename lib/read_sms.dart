@@ -1,57 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
-import 'package:intl/intl.dart';
 
+import 'models/parsed_income.dart';
+import 'services/income_store.dart';
 import 'tax-intelligence/index.dart';
-import 'widgets/transaction_card.dart';
-import 'widgets/tax_health_card.dart';
-import 'widgets/suggestion_card.dart';
-import 'widgets/income_summary_card.dart';
 import 'theme/app_spacing.dart';
-import 'services/database_service.dart';
-import 'models/transaction.dart' as app_models;
-
-// --- Model ---
-
-class ParsedIncome {
-  final double amount;
-  final String source;
-  final DateTime date;
-
-  ParsedIncome({
-    required this.amount,
-    required this.source,
-    required this.date,
-  });
-}
-
-// --- Parser ---
+import 'widgets/income_summary_card.dart';
+import 'widgets/suggestion_card.dart';
+import 'widgets/tax_health_card.dart';
+import 'widgets/transaction_card.dart';
 
 class SmsParser {
   static bool isIncomeMessage(String body) {
     final text = body.toLowerCase();
-    if (text.contains("debited") ||
-        text.contains("dr.") ||
-        text.contains("spent") ||
-        text.contains("withdrawn")) {
+    if (text.contains('debited') ||
+        text.contains('dr.') ||
+        text.contains('spent') ||
+        text.contains('withdrawn')) {
       return false;
     }
-    return text.contains("credited") ||
-        text.contains("received") ||
-        text.contains("deposited") ||
-        text.contains("cr.");
+
+    return text.contains('credited') ||
+        text.contains('received') ||
+        text.contains('deposited') ||
+        text.contains('cr.');
   }
 
   static bool isGigIncome(String body) {
     final text = body.toLowerCase();
-    return text.contains("swiggy") ||
-        text.contains("zomato") ||
-        text.contains("uber") ||
-        text.contains("ola") ||
-        text.contains("zepto") ||
-        text.contains("earnings") ||
-        text.contains("payout") ||
-        text.contains("settlement");
+    return text.contains('swiggy') ||
+        text.contains('zomato') ||
+        text.contains('uber') ||
+        text.contains('ola') ||
+        text.contains('zepto') ||
+        text.contains('earnings') ||
+        text.contains('payout') ||
+        text.contains('settlement');
   }
 
   static bool isValidGigIncome(String body) {
@@ -62,27 +46,28 @@ class SmsParser {
     final patterns = [
       RegExp(r'₹\s?([\d,]+(?:\.\d{1,2})?)'),
       RegExp(r'inr\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'rs\.?\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'rs\.?\s?([\d,]+)', caseSensitive: false),
     ];
 
     for (final regex in patterns) {
       final match = regex.firstMatch(text);
       if (match != null) {
-        final raw = match.group(1)!.replaceAll(",", "");
+        final raw = match.group(1)!.replaceAll(',', '');
         return double.tryParse(raw);
       }
     }
+
     return null;
   }
 
   static String extractSource(String text) {
     final lower = text.toLowerCase();
-    if (lower.contains("swiggy")) return "Swiggy";
-    if (lower.contains("zomato")) return "Zomato";
-    if (lower.contains("uber")) return "Uber";
-    if (lower.contains("ola")) return "Ola";
-    if (lower.contains("zepto")) return "Zepto";
-    return "Unknown";
+    if (lower.contains('swiggy')) return 'Swiggy';
+    if (lower.contains('zomato')) return 'Zomato';
+    if (lower.contains('uber')) return 'Uber';
+    if (lower.contains('ola')) return 'Ola';
+    if (lower.contains('zepto')) return 'Zepto';
+    return 'Unknown';
   }
 
   static DateTime? extractDate(SmsMessage message) {
@@ -92,7 +77,7 @@ class SmsParser {
   }
 
   static ParsedIncome? parse(SmsMessage message) {
-    final body = message.body ?? "";
+    final body = message.body ?? '';
     if (!isValidGigIncome(body)) return null;
 
     final amount = extractAmount(body);
@@ -109,7 +94,13 @@ class SmsParser {
   }
 }
 
-// --- Screen ---
+@pragma('vm:entry-point')
+Future<void> smsBackgroundHandler(SmsMessage message) async {
+  final parsed = SmsParser.parse(message);
+  if (parsed != null) {
+    await IncomeStore.upsert(parsed);
+  }
+}
 
 class ReadSmsScreen extends StatefulWidget {
   const ReadSmsScreen({
@@ -126,110 +117,61 @@ class ReadSmsScreen extends StatefulWidget {
 class _ReadSmsScreenState extends State<ReadSmsScreen> {
   final Telephony telephony = Telephony.instance;
   final List<ParsedIncome> _incomes = [];
-  TaxIntelligenceResult? _taxResult;
 
-  final _numFmt = NumberFormat('#,##,##0.00', 'en_IN');
-  final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+  TaxIntelligenceResult? _taxResult;
 
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedTransactions();
-    startListening();
+  bool _containsIncome(ParsedIncome income) {
+    return _incomes.any((entry) => entry.dedupeKey == income.dedupeKey);
   }
 
-  Future<void> _loadSavedTransactions() async {
-    try {
-      final transactions =
-          await DatabaseService.getTransactionsByType('income');
-
-      final loadedIncomes = transactions.map((t) {
-        return ParsedIncome(
-          amount: _parseAmountString(t.amount),
-          source: t.sender,
-          date: t.date,
-        );
-      }).toList();
-
-      loadedIncomes.sort((a, b) => b.date.compareTo(a.date));
-
-      if (!mounted) return;
-
-      setState(() {
-        _incomes
-          ..clear()
-          ..addAll(loadedIncomes);
-
-        _taxResult = _incomes.isEmpty
-            ? null
-            : TaxIntelligence.analyze(_totalIncome);
-      });
-    } catch (e) {
-      debugPrint('Failed to load saved transactions: $e');
+  void _onNewIncome(ParsedIncome income) {
+    if (_containsIncome(income)) {
+      return;
     }
-  }
 
-  double _parseAmountString(String value) {
-    return double.tryParse(
-          value.replaceAll(',', '').replaceAll('₹', '').trim(),
-        ) ??
-        0.0;
-  }
-
-  Future<void> _saveIncomeToDatabase(ParsedIncome income,
-      {String messageBody = 'Parsed SMS income'}) async {
-    try {
-      await DatabaseService.insertTransaction(
-        app_models.Transaction(
-          amount: income.amount.toString(),
-          sender: income.source,
-          messageBody: messageBody,
-          transactionType: 'income',
-          date: income.date,
-        ),
-      );
-    } catch (e) {
-      debugPrint('Failed to save transaction: $e');
-    }
-  }
-
-  Future<void> _onNewIncome(ParsedIncome income,
-      {String messageBody = 'Parsed SMS income'}) async {
     setState(() {
-      final alreadyExists = _incomes.any(
-        (item) =>
-            item.amount == income.amount &&
-            item.source == income.source &&
-            item.date.millisecondsSinceEpoch ==
-                income.date.millisecondsSinceEpoch,
-      );
-
-      if (!alreadyExists) {
-        _incomes.insert(0, income);
-        _incomes.sort((a, b) => b.date.compareTo(a.date));
-      }
-
+      _incomes.insert(0, income);
       _taxResult = TaxIntelligence.analyze(_totalIncome);
     });
-
-    await _saveIncomeToDatabase(income, messageBody: messageBody);
   }
 
-  void startListening() {
+  Future<bool> _ensureSmsPermission() async {
+    final granted = await telephony.requestPhoneAndSmsPermissions;
+    return granted ?? false;
+  }
+
+  Future<void> _loadStoredIncomes() async {
+    final stored = await IncomeStore.loadAll();
+    if (!mounted) return;
+
+    setState(() {
+      _incomes
+        ..clear()
+        ..addAll(stored);
+      _taxResult = _incomes.isEmpty ? null : TaxIntelligence.analyze(_totalIncome);
+    });
+  }
+
+  Future<void> startListening() async {
+    final hasPermission = await _ensureSmsPermission();
+    if (!hasPermission) {
+      return;
+    }
+
     telephony.listenIncomingSms(
-      onNewMessage: (SmsMessage message) async {
+      onNewMessage: (SmsMessage message) {
         final parsed = SmsParser.parse(message);
         if (parsed != null) {
-          await _onNewIncome(
-            parsed,
-            messageBody: message.body ?? 'Parsed SMS income',
-          );
+          IncomeStore.upsert(parsed);
+          if (!mounted) return;
+          _onNewIncome(parsed);
         }
       },
-      listenInBackground: false,
+      onBackgroundMessage: smsBackgroundHandler,
+      listenInBackground: true,
     );
   }
 
@@ -242,21 +184,29 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       return;
     }
 
-    await _onNewIncome(
-      ParsedIncome(
-        amount: amount,
-        source: SmsParser.extractSource(body),
-        date: DateTime.now(),
-      ),
-      messageBody: body,
+    final income = ParsedIncome(
+      amount: amount,
+      source: SmsParser.extractSource(body),
+      date: DateTime.now(),
     );
+
+    await IncomeStore.upsert(income);
+    if (!mounted) return;
+    _onNewIncome(income);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredIncomes();
+    startListening();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Gig Income Tracker"),
+        title: const Text('Gig Income Tracker'),
         actions: widget.appBarActions,
       ),
       body: _incomes.isEmpty
@@ -273,18 +223,18 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                           child: Row(
                             children: [
                               _testBtn(
-                                "Swiggy ₹850",
-                                "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
+                                'Swiggy ₹850',
+                                'Your account has been credited with ₹850.00. Payment received from Swiggy settlement.',
                               ),
                               const SizedBox(width: AppSpacing.sm),
                               _testBtn(
-                                "Zomato ₹1200",
-                                "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
+                                'Zomato ₹1200',
+                                'INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.',
                               ),
                               const SizedBox(width: AppSpacing.sm),
                               _testBtn(
-                                "Uber ₹450",
-                                "Rs. 450 deposited to your a/c. Uber earnings settlement.",
+                                'Uber ₹450',
+                                'Rs. 450 deposited to your a/c. Uber earnings settlement.',
                               ),
                             ],
                           ),
@@ -305,9 +255,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                         const SizedBox(height: AppSpacing.md),
                         ..._incomes.take(5).map((income) {
                           return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppSpacing.md,
-                            ),
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
                             child: TransactionCard(
                               source: income.source,
                               amount: income.amount,
@@ -361,13 +309,13 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
               child: Row(
                 children: [
                   _testBtn(
-                    "Add Swiggy",
-                    "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
+                    'Add Swiggy',
+                    'Your account has been credited with ₹850.00. Payment received from Swiggy settlement.',
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   _testBtn(
-                    "Add Zomato",
-                    "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
+                    'Add Zomato',
+                    'INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.',
                   ),
                 ],
               ),
@@ -398,8 +346,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
           ),
           if (result.suggestions.isNotEmpty)
             const SizedBox(height: AppSpacing.lg),
-          if (result.suggestions.isNotEmpty)
-            _buildSuggestionsSection(result),
+          if (result.suggestions.isNotEmpty) _buildSuggestionsSection(result),
         ],
       ),
     );
