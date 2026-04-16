@@ -133,12 +133,14 @@ class DemoSmsListScreen extends StatefulWidget {
 }
 
 class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
-  late final List<ParsedSms> _cachedTransactions;
+  late final List<ParsedSms> _demoTransactions;
+  late List<ParsedSms> _allTransactions;
 
   @override
   void initState() {
     super.initState();
-    _cachedTransactions = _parseDemoMessages();
+    _demoTransactions = _parseDemoMessages();
+    _allTransactions = List.from(_demoTransactions);
   }
 
   static const List<String> _demoMessages = [
@@ -179,16 +181,16 @@ class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
   }
 
   double get _totalIncome =>
-      _cachedTransactions.where((t) => t.isCredit).fold(0, (sum, t) => sum + t.amount);
+      _allTransactions.where((t) => t.isCredit).fold(0, (sum, t) => sum + t.amount);
 
   double get _totalExpense =>
-      _cachedTransactions.where((t) => !t.isCredit).fold(0, (sum, t) => sum + t.amount);
+      _allTransactions.where((t) => !t.isCredit).fold(0, (sum, t) => sum + t.amount);
 
   double get _netBalance => _totalIncome - _totalExpense;
 
   @override
   Widget build(BuildContext context) {
-    final transactions = _cachedTransactions;
+    final transactions = _allTransactions;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -202,6 +204,11 @@ class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
           preferredSize: const Size.fromHeight(1),
           child: Container(color: Colors.black12, height: 1),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddIncomeDialog(context),
+        backgroundColor: Colors.green.shade700,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: transactions.isEmpty
           ? const Center(child: Text('No transactions found'))
@@ -236,6 +243,51 @@ class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
               ],
             ),
     );
+  }
+
+  void _showAddIncomeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AddIncomeDialog(
+        onSave: _addNewIncome,
+      ),
+    );
+  }
+
+  Future<void> _addNewIncome(double amount, String source) async {
+    try {
+      final transaction = app_models.Transaction(
+        amount: amount.toString(),
+        sender: source,
+        messageBody: 'Manual income entry',
+        transactionType: 'income',
+        date: DateTime.now(),
+      );
+
+      await DatabaseService.insertTransaction(transaction);
+
+      if (!mounted) return;
+
+      // Add to UI list
+      setState(() {
+        _allTransactions.insert(
+          0,
+          ParsedSms(
+            source: source,
+            amount: amount,
+            isCredit: true,
+          ),
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Income added successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
   }
 
   Widget _buildStatItem(String label, double amount, Color color) {
@@ -285,6 +337,126 @@ class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// --- Add Income Dialog ---
+
+class AddIncomeDialog extends StatefulWidget {
+  final Function(double amount, String source) onSave;
+
+  const AddIncomeDialog({required this.onSave, super.key});
+
+  @override
+  State<AddIncomeDialog> createState() => _AddIncomeDialogState();
+}
+
+class _AddIncomeDialogState extends State<AddIncomeDialog> {
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _sourceController = TextEditingController();
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _sourceController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    setState(() => _errorMessage = null);
+
+    final amountText = _amountController.text.trim();
+    final source = _sourceController.text.trim();
+
+    if (amountText.isEmpty) {
+      setState(() => _errorMessage = 'Amount is required');
+      return;
+    }
+
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      setState(() => _errorMessage = 'Enter a valid amount > 0');
+      return;
+    }
+
+    if (source.isEmpty) {
+      setState(() => _errorMessage = 'Source is required');
+      return;
+    }
+
+    Navigator.pop(context);
+    widget.onSave(amount, source);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add Income',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Amount',
+                hintText: 'e.g., 5000',
+                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _sourceController,
+              decoration: InputDecoration(
+                labelText: 'Source',
+                hintText: 'e.g., Freelance, Client, Swiggy',
+                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                color: Colors.red.shade50,
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text('Add'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
