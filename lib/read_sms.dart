@@ -207,88 +207,211 @@ class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
     return results;
   }
 
+  // Calculate totals
+  double get _totalIncome =>
+      _cachedTransactions.where((t) => t.isCredit).fold(0, (sum, t) => sum + t.amount);
+
+  double get _totalExpense =>
+      _cachedTransactions.where((t) => !t.isCredit).fold(0, (sum, t) => sum + t.amount);
+
+  double get _netBalance => _totalIncome - _totalExpense;
+
   @override
   Widget build(BuildContext context) {
     final transactions = _cachedTransactions;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        title: const Text('Transaction Demo'),
+        title: const Text('Dashboard', style: TextStyle(fontWeight: FontWeight.w600)),
         elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
       ),
       body: transactions.isEmpty
           ? Center(
               child: Text(
                 'No transactions parsed',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: transactions.length,
-              itemBuilder: (context, index) {
-                final txn = transactions[index];
-                return _buildTransactionTile(txn);
-              },
+          : ListView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 20,
+                vertical: 16,
+              ),
+              children: [
+                // Overview Section
+                Text(
+                  'Overview',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _buildOverviewCards(),
+                const SizedBox(height: 28),
+                
+                // Transactions Section
+                Text(
+                  'Transactions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                ...transactions.map((txn) => _buildTransactionTile(txn)),
+              ],
             ),
+    );
+  }
+
+  Widget _buildOverviewCards() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildOverviewCard(
+            label: 'Total Income',
+            amount: _totalIncome,
+            color: Colors.green,
+            icon: Icons.arrow_downward,
+          ),
+          const SizedBox(width: 12),
+          _buildOverviewCard(
+            label: 'Total Expense',
+            amount: _totalExpense,
+            color: Colors.red,
+            icon: Icons.arrow_upward,
+          ),
+          const SizedBox(width: 12),
+          _buildOverviewCard(
+            label: 'Net Balance',
+            amount: _netBalance,
+            color: _netBalance >= 0 ? Colors.green : Colors.red,
+            icon: _netBalance >= 0 ? Icons.trending_up : Icons.trending_down,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewCard({
+    required String label,
+    required double amount,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      width: 160,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, size: 14, color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color.shade700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTransactionTile(ParsedSms txn) {
     final textColor = txn.isCredit ? Colors.green.shade700 : Colors.red.shade700;
-    final bgColor =
-        txn.isCredit ? Colors.green.shade50 : Colors.red.shade50;
     final amountPrefix = txn.isCredit ? '+' : '−';
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: textColor,
-          width: 0.5,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    txn.source,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  txn.source,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    txn.isCredit ? 'Income' : 'Expense',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  txn.isCredit ? 'Credit' : 'Debit',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textColor,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            Text(
-              '$amountPrefix₹${txn.amount.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
+          ),
+          Text(
+            '$amountPrefix₹${txn.amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: textColor,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
