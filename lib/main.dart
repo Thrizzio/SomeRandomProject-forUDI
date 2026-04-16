@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'services/local_auth_service.dart';
 import 'widgets/auth_gate.dart';
-import 'read_sms.dart'; // Add this import
+import 'read_sms.dart';
 
 void main() {
   runApp(const MyApp());
@@ -33,9 +33,7 @@ class MyApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,
         ),
-        // TEMP: Using demo screen for hackathon demo
-        // Switch back to AuthGate() after demo
-        home: const DemoSmsListScreen(),
+        home: const AuthGate(),
       ),
     );
   }

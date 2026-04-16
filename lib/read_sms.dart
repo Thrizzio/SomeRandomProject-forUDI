@@ -82,6 +82,21 @@ class SmsParser {
     if (lower.contains("uber")) return "Uber";
     if (lower.contains("ola")) return "Ola";
     if (lower.contains("zepto")) return "Zepto";
+    if (lower.contains("amazon")) return "Amazon";
+    if (lower.contains("techcorp")) return "TechCorp";
+    if (lower.contains("freelance")) return "Freelance";
+    if (lower.contains("interior")) return "Interior Design";
+    // Extract sender name from "from <name>" or "to <name>" patterns
+    final fromMatch = RegExp(r'from\s+([A-Za-z]+)').firstMatch(lower);
+    if (fromMatch != null) {
+      final name = fromMatch.group(1) ?? "Unknown";
+      return name[0].toUpperCase() + name.substring(1);
+    }
+    final toMatch = RegExp(r'to\s+([A-Za-z]+)').firstMatch(lower);
+    if (toMatch != null) {
+      final name = toMatch.group(1) ?? "Unknown";
+      return name[0].toUpperCase() + name.substring(1);
+    }
     return "Unknown";
   }
 
@@ -125,10 +140,23 @@ class ParsedSms {
 
 // --- Demo SMS Screen (Production-Ready) ---
 
-class DemoSmsListScreen extends StatelessWidget {
+class DemoSmsListScreen extends StatefulWidget {
   const DemoSmsListScreen({super.key});
 
-  final List<String> _demoMessages = const [
+  @override
+  State<DemoSmsListScreen> createState() => _DemoSmsListScreenState();
+}
+
+class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
+  late final List<ParsedSms> _cachedTransactions;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachedTransactions = _parseDemoMessages();
+  }
+
+  static const List<String> _demoMessages = [
     "Acct XX123 credited with Rs. 5,000 from SWIGGY on 15 Apr. Avl bal Rs. 25,490",
     "INR 2,500 received via UPI from FreelanceClient. Ref: 234567. Bal Rs. 27,990",
     "₹1,200 debited for fuel. Txn ID: 998877. Avl balance Rs. 24,790",
@@ -150,7 +178,8 @@ class DemoSmsListScreen extends StatelessWidget {
   List<ParsedSms> _parseDemoMessages() {
     final results = <ParsedSms>[];
 
-    for (final message in _demoMessages) {
+    for (int i = 0; i < _demoMessages.length; i++) {
+      final message = _demoMessages[i];
       try {
         final amount = SmsParser.extractAmount(message);
         
@@ -169,9 +198,9 @@ class DemoSmsListScreen extends StatelessWidget {
             isCredit: isCredit,
           ),
         );
-      } catch (e) {
+      } catch (e, stackTrace) {
         // Safely skip any parsing errors
-        debugPrint('Parse error for message: $e');
+        debugPrint('Parse error at message ${i + 1}: $e\n$stackTrace');
       }
     }
 
@@ -180,7 +209,7 @@ class DemoSmsListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final transactions = _parseDemoMessages();
+    final transactions = _cachedTransactions;
 
     return Scaffold(
       appBar: AppBar(
@@ -206,9 +235,9 @@ class DemoSmsListScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionTile(ParsedSms txn) {
-    final textColor = txn.isCredit ? Colors.green[700] : Colors.red[700];
+    final textColor = txn.isCredit ? Colors.green.shade700 : Colors.red.shade700;
     final bgColor =
-        txn.isCredit ? Colors.green[50] : Colors.red[50];
+        txn.isCredit ? Colors.green.shade50 : Colors.red.shade50;
     final amountPrefix = txn.isCredit ? '+' : '−';
 
     return Container(
@@ -217,7 +246,7 @@ class DemoSmsListScreen extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: textColor ?? Colors.grey,
+          color: textColor,
           width: 0.5,
         ),
       ),
