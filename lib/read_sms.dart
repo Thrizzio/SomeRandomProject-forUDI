@@ -109,6 +109,162 @@ class SmsParser {
   }
 }
 
+// --- Production SMS Model ---
+
+class ParsedSms {
+  final String source;
+  final double amount;
+  final bool isCredit;
+
+  ParsedSms({
+    required this.source,
+    required this.amount,
+    required this.isCredit,
+  });
+}
+
+// --- Demo SMS Screen (Production-Ready) ---
+
+class DemoSmsListScreen extends StatelessWidget {
+  const DemoSmsListScreen({super.key});
+
+  final List<String> _demoMessages = const [
+    "Acct XX123 credited with Rs. 5,000 from SWIGGY on 15 Apr. Avl bal Rs. 25,490",
+    "INR 2,500 received via UPI from FreelanceClient. Ref: 234567. Bal Rs. 27,990",
+    "₹1,200 debited for fuel. Txn ID: 998877. Avl balance Rs. 24,790",
+    "ZOMATO order of ₹850 debited from your account. Bal Rs. 23,940",
+    "₹12,500 transferred to UBER. Ref no: 556677. Balance Rs. 11,440",
+    "Payment of Rs. 3,200 to AMAZON successful. Avl bal Rs. 8,240",
+    "Rs. 8,000 credited from UBER weekly payout. Ref: 778899. Bal Rs. 16,240",
+    "INR 15,000 received for freelance project. Txn ID: 112233. Bal Rs. 31,240",
+    "₹5,500 bank transfer received from CLIENT. Avl Rs. 36,740",
+    "Rs. 25,000 credited for Interior Design project. Ref: 445566. Bal Rs. 61,740",
+    "UPI received ₹3,750 from HARPREET. UPI Ref: 667788. Bal Rs. 65,490",
+    "SWIGGY delivery earnings: Rs. 4,200 credited. Avl Rs. 69,690",
+    "₹2,100 debited for ZOMATO subscription. Txn ID: 889900. Bal Rs. 67,590",
+    "Rs. 18,000 credited from TECHCORP freelance payment. Ref: 223344. Bal Rs. 85,590",
+    "UPI transfer INR 1,500 to SHARMA. Ref: 998822. Avl Rs. 84,090",
+  ];
+
+  /// Parse all demo messages safely, skipping any that fail
+  List<ParsedSms> _parseDemoMessages() {
+    final results = <ParsedSms>[];
+
+    for (final message in _demoMessages) {
+      try {
+        final amount = SmsParser.extractAmount(message);
+        
+        // Skip if amount extraction fails
+        if (amount == null || amount <= 0) {
+          continue;
+        }
+
+        final isCredit = SmsParser.isIncomeMessage(message);
+        final source = SmsParser.extractSource(message);
+
+        results.add(
+          ParsedSms(
+            source: source,
+            amount: amount,
+            isCredit: isCredit,
+          ),
+        );
+      } catch (e) {
+        // Safely skip any parsing errors
+        debugPrint('Parse error for message: $e');
+      }
+    }
+
+    return results;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final transactions = _parseDemoMessages();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Transaction Demo'),
+        elevation: 0,
+      ),
+      body: transactions.isEmpty
+          ? Center(
+              child: Text(
+                'No transactions parsed',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: transactions.length,
+              itemBuilder: (context, index) {
+                final txn = transactions[index];
+                return _buildTransactionTile(txn);
+              },
+            ),
+    );
+  }
+
+  Widget _buildTransactionTile(ParsedSms txn) {
+    final textColor = txn.isCredit ? Colors.green[700] : Colors.red[700];
+    final bgColor =
+        txn.isCredit ? Colors.green[50] : Colors.red[50];
+    final amountPrefix = txn.isCredit ? '+' : '−';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: textColor ?? Colors.grey,
+          width: 0.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    txn.source,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    txn.isCredit ? 'Income' : 'Expense',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '$amountPrefix₹${txn.amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // --- Screen ---
 
 class ReadSmsScreen extends StatefulWidget {
