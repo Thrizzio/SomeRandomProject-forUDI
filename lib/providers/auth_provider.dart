@@ -17,8 +17,15 @@ class AuthProvider extends ChangeNotifier {
   Future<void> init() async {
     user = await authService.currentUser();
     
-    // Restore email if user exists
-    if (user != null) {
+    // If no active session, try to restore from saved email
+    if (user == null) {
+      final savedEmail = await UserPreferences.getEmail();
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        // Restore user session from saved email
+        user = AppUser(email: savedEmail);
+      }
+    } else {
+      // Save current user email for persistence
       await UserPreferences.saveEmail(user!.email);
     }
     

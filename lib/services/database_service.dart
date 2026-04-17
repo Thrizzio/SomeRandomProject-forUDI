@@ -44,23 +44,57 @@ class DatabaseService {
     ''');
   }
 
-  /// Handle database upgrade
+  /// Handle database upgrade - Rebuild table with new UNIQUE constraint
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      try {
-        await db.execute('ALTER TABLE $_tableName ADD COLUMN userEmail TEXT');
-      } catch (e) {
-        // Column might already exist, ignore
-      }
+      await db.transaction((txn) async {
+        try {
+          // Create new table with userEmail column and updated UNIQUE constraint
+          await txn.execute('''
+            CREATE TABLE ${_tableName}_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              amount TEXT NOT NULL,
+              sender TEXT NOT NULL,
+              messageBody TEXT NOT NULL,
+              transactionType TEXT NOT NULL,
+              date TEXT NOT NULL,
+              userEmail TEXT,
+              createdAt TEXT NOT NULL,
+              UNIQUE(amount, sender, date, userEmail)
+            )
+          ''');
+
+          // Copy existing data from old table
+          await txn.execute('''
+            INSERT INTO ${_tableName}_new (
+              id, amount, sender, messageBody, transactionType, date, userEmail, createdAt
+            )
+            SELECT
+              id, amount, sender, messageBody, transactionType, date, NULL, createdAt
+            FROM $_tableName
+          ''');
+
+          // Drop old table and rename new one
+          await txn.execute('DROP TABLE $_tableName');
+          await txn.execute('ALTER TABLE ${_tableName}_new RENAME TO $_tableName');
+        } catch (e) {
+          rethrow;
+        }
+      });
     }
   }
 
   /// Insert transaction
   static Future<int> insertTransaction(Transaction transaction) async {
     try {
-      final db = await database;
       final userEmail = await UserPreferences.getEmail();
       
+      // Prevent inserting transaction without user email
+      if (userEmail == null || userEmail.isEmpty) {
+        throw Exception('Cannot insert transaction: no user logged in');
+      }
+      
+      final db = await database;
       final data = transaction.toJson();
       data['userEmail'] = userEmail;
       
