@@ -282,9 +282,8 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
           ..clear()
           ..addAll(loadedIncomes);
 
-        _taxResult = _incomes.isEmpty
-            ? null
-            : TaxIntelligence.analyze(_totalIncome);
+        _taxResult =
+            _incomes.isEmpty ? null : TaxIntelligence.analyze(_totalIncome);
       });
     } catch (e) {
       debugPrint('Failed to load saved transactions: $e');
@@ -298,8 +297,10 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
         0.0;
   }
 
-  Future<void> _saveIncomeToDatabase(ParsedIncome income,
-      {String messageBody = 'Parsed SMS income'}) async {
+  Future<void> _saveIncomeToDatabase(
+    ParsedIncome income, {
+    String messageBody = 'Parsed SMS income',
+  }) async {
     try {
       await DatabaseService.insertTransaction(
         app_models.Transaction(
@@ -315,8 +316,10 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
     }
   }
 
-  Future<void> _onNewIncome(ParsedIncome income,
-      {String messageBody = 'Parsed SMS income'}) async {
+  Future<void> _onNewIncome(
+    ParsedIncome income, {
+    String messageBody = 'Parsed SMS income',
+  }) async {
     setState(() {
       final alreadyExists = _incomes.any(
         (item) =>
@@ -352,25 +355,6 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
     );
   }
 
-  Future<void> _injectTestSms(String body) async {
-    final amount = SmsParser.extractAmount(body);
-    if (amount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Parser couldn't extract amount")),
-      );
-      return;
-    }
-
-    await _onNewIncome(
-      ParsedIncome(
-        amount: amount,
-        source: SmsParser.extractSource(body),
-        date: DateTime.now(),
-      ),
-      messageBody: body,
-    );
-  }
-
   Future<void> _addManualIncome(double amount, String source) async {
     try {
       final income = ParsedIncome(
@@ -392,6 +376,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -417,28 +402,6 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _testBtn(
-                                "Swiggy ₹850",
-                                "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              _testBtn(
-                                "Zomato ₹1200",
-                                "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              _testBtn(
-                                "Uber ₹450",
-                                "Rs. 450 deposited to your a/c. Uber earnings settlement.",
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
                         IncomeSummaryCard(
                           count: _incomes.length,
                           total: _totalIncome,
@@ -498,28 +461,6 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
               'We\'ll monitor your SMS and automatically detect income deposits.',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Or test with sample transactions:',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _testBtn(
-                    "Add Swiggy",
-                    "Your account has been credited with ₹850.00. Payment received from Swiggy settlement.",
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  _testBtn(
-                    "Add Zomato",
-                    "INR 1,200.50 credited to your account. Zomato payout for week ending 10-Apr-2025.",
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -590,12 +531,5 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       return SuggestionType.warning;
     }
     return SuggestionType.info;
-  }
-
-  Widget _testBtn(String label, String sms) {
-    return ElevatedButton(
-      onPressed: () => _injectTestSms(sms),
-      child: Text(label),
-    );
   }
 }
