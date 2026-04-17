@@ -1,10 +1,11 @@
 import 'package:sqflite/sqflite.dart' hide Transaction;
 import 'package:path/path.dart';
 import '../models/transaction.dart';
+import 'user_preferences.dart';
 
 class DatabaseService {
   static const String _dbName = 'sms_transactions.db';
-  static const int _version = 1;
+  static const int _version = 2;
   static const String _tableName = 'transactions';
 
   static Database? _database;
@@ -22,6 +23,7 @@ class DatabaseService {
       path,
       version: _version,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -35,19 +37,36 @@ class DatabaseService {
         messageBody TEXT NOT NULL,
         transactionType TEXT NOT NULL,
         date TEXT NOT NULL,
+        userEmail TEXT,
         createdAt TEXT NOT NULL,
-        UNIQUE(amount, sender, date)
+        UNIQUE(amount, sender, date, userEmail)
       )
     ''');
+  }
+
+  /// Handle database upgrade
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try {
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN userEmail TEXT');
+      } catch (e) {
+        // Column might already exist, ignore
+      }
+    }
   }
 
   /// Insert transaction
   static Future<int> insertTransaction(Transaction transaction) async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      final data = transaction.toJson();
+      data['userEmail'] = userEmail;
+      
       return await db.insert(
         _tableName,
-        transaction.toJson(),
+        data,
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
     } catch (e) {
@@ -55,12 +74,18 @@ class DatabaseService {
     }
   }
 
-  /// Get all transactions
+  /// Get all transactions for current user
   static Future<List<Transaction>> getAllTransactions() async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      if (userEmail == null) return [];
+      
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
+        where: 'userEmail = ?',
+        whereArgs: [userEmail],
         orderBy: 'date DESC',
       );
       return maps.map((map) => Transaction.fromJson(map)).toList();
@@ -69,15 +94,19 @@ class DatabaseService {
     }
   }
 
-  /// Get transactions by type (income/expense)
+  /// Get transactions by type (income/expense) for current user
   static Future<List<Transaction>> getTransactionsByType(
       String transactionType) async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      if (userEmail == null) return [];
+      
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
-        where: 'transactionType = ?',
-        whereArgs: [transactionType],
+        where: 'transactionType = ? AND userEmail = ?',
+        whereArgs: [transactionType, userEmail],
         orderBy: 'date DESC',
       );
       return maps.map((map) => Transaction.fromJson(map)).toList();
@@ -86,17 +115,22 @@ class DatabaseService {
     }
   }
 
-  /// Get transactions for date range
+  /// Get transactions for date range for current user
   static Future<List<Transaction>> getTransactionsByDateRange(
       DateTime startDate, DateTime endDate) async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      if (userEmail == null) return [];
+      
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
-        where: 'date BETWEEN ? AND ?',
+        where: 'date BETWEEN ? AND ? AND userEmail = ?',
         whereArgs: [
           startDate.toIso8601String(),
           endDate.toIso8601String(),
+          userEmail,
         ],
         orderBy: 'date DESC',
       );
@@ -106,25 +140,33 @@ class DatabaseService {
     }
   }
 
-  /// Get transaction count
+  /// Get transaction count for current user
   static Future<int> getTransactionCount() async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      if (userEmail == null) return 0;
+      
       final result =
-          await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName');
+          await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName WHERE userEmail = ?', [userEmail]);
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Get total amount by type
+  /// Get total amount by type for current user
   static Future<double> getTotalAmountByType(String transactionType) async {
     try {
       final db = await database;
+      final userEmail = await UserPreferences.getEmail();
+      
+      if (userEmail == null) return 0.0;
+      
       final result = await db.rawQuery(
-        'SELECT SUM(CAST(SUBSTR(amount, 2) AS REAL)) as total FROM $_tableName WHERE transactionType = ?',
-        [transactionType],
+        'SELECT SUM(CAST(SUBSTR(amount, 2) AS REAL)) as total FROM $_tableName WHERE transactionType = ? AND userEmail = ?',
+        [transactionType, userEmail],
       );
       final total = result.isNotEmpty ? result[0]['total'] : 0;
       return (total as num?)?.toDouble() ?? 0.0;

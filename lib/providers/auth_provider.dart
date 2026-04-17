@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/user_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService authService;
@@ -15,6 +16,12 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> init() async {
     user = await authService.currentUser();
+    
+    // Restore email if user exists
+    if (user != null) {
+      await UserPreferences.saveEmail(user!.email);
+    }
+    
     notifyListeners();
   }
 
@@ -24,6 +31,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       user = await authService.login(email, password);
+      if (user != null) {
+        await UserPreferences.saveEmail(user!.email);
+      }
       return user != null;
     } catch (e) {
       error = e.toString();
@@ -53,6 +63,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await authService.logout();
     user = null;
+    await UserPreferences.clearEmail();
     notifyListeners();
   }
 }
