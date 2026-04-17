@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
 import 'package:intl/intl.dart';
-
+import 'package:flutter/foundation.dart';
 import 'tax-intelligence/index.dart';
 import 'widgets/transaction_card.dart';
 import 'widgets/tax_health_card.dart';
@@ -123,7 +123,28 @@ class ReadSmsScreen extends StatefulWidget {
   State<ReadSmsScreen> createState() => _ReadSmsScreenState();
 }
 
-class _ReadSmsScreenState extends State<ReadSmsScreen> {
+@pragma('vm:entry-point')
+Future<void> smsBackgroundHandler(SmsMessage message) async {
+  try {
+    final parsed = SmsParser.parse(message);
+    if (parsed == null) return;
+
+    await DatabaseService.insertTransaction(
+      app_models.Transaction(
+        amount: parsed.amount.toString(),
+        sender: parsed.source,
+        messageBody: message.body ?? 'Parsed SMS income',
+        transactionType: 'income',
+        date: parsed.date,
+      ),
+    );
+  } catch (e) {
+    debugPrint('Background SMS handler failed: $e');
+  }
+}
+
+class _ReadSmsScreenState extends State<ReadSmsScreen>
+    with WidgetsBindingObserver {
   final Telephony telephony = Telephony.instance;
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
@@ -135,11 +156,25 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addObserver(this);
+  _loadSavedTransactions();
+  startListening();
+}
+
+@override
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  super.dispose();
+}
+
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed) {
     _loadSavedTransactions();
-    startListening();
   }
+}
 
   Future<void> _loadSavedTransactions() async {
     try {
@@ -221,20 +256,29 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
     await _saveIncomeToDatabase(income, messageBody: messageBody);
   }
 
-  void startListening() {
-    telephony.listenIncomingSms(
-      onNewMessage: (SmsMessage message) async {
-        final parsed = SmsParser.parse(message);
-        if (parsed != null) {
-          await _onNewIncome(
-            parsed,
-            messageBody: message.body ?? 'Parsed SMS income',
-          );
-        }
-      },
-      listenInBackground: false,
-    );
+  Future<void> startListening() async {
+  final bool? permissionsGranted =
+      await telephony.requestPhoneAndSmsPermissions;
+
+  if (permissionsGranted != true) {
+    debugPrint('SMS permissions not granted');
+    return;
   }
+
+  telephony.listenIncomingSms(
+    onNewMessage: (SmsMessage message) async {
+      final parsed = SmsParser.parse(message);
+      if (parsed != null) {
+        await _onNewIncome(
+          parsed,
+          messageBody: message.body ?? 'Parsed SMS income',
+        );
+      }
+    },
+    onBackgroundMessage: smsBackgroundHandler,
+    listenInBackground: true,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
