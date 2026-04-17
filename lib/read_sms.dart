@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+
 import 'tax-intelligence/index.dart';
 import 'widgets/transaction_card.dart';
 import 'widgets/tax_health_card.dart';
@@ -9,7 +10,9 @@ import 'widgets/suggestion_card.dart';
 import 'widgets/income_summary_card.dart';
 import 'theme/app_spacing.dart';
 import 'services/database_service.dart';
+import 'services/bank_statement_service.dart';
 import 'models/transaction.dart' as app_models;
+import 'screens/bank_statement/bank_statement_upload_page.dart';
 
 // --- Model ---
 
@@ -149,16 +152,14 @@ class _ReadSmsScreenState extends State<ReadSmsScreen>
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
 
-  final _numFmt = NumberFormat('#,##,##0.00', 'en_IN');
-  final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
-
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
-  @override
+@override
 void initState() {
   super.initState();
   WidgetsBinding.instance.addObserver(this);
+  _initializeBankStatementDatabase();
   _loadSavedTransactions();
   startListening();
 }
@@ -176,12 +177,21 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   }
 }
 
+  Future<void> _initializeBankStatementDatabase() async {
+    try {
+      await BankStatementService.initBankStatementTable();
+    } catch (e) {
+      debugPrint('Failed to initialize bank statement table: $e');
+    }
+  }
+
   Future<void> _loadSavedTransactions() async {
     try {
-      final transactions =
+      // Load SMS transactions
+      final smsTransactions =
           await DatabaseService.getTransactionsByType('income');
 
-      final loadedIncomes = transactions.map((t) {
+      final smsIncomes = smsTransactions.map((t) {
         return ParsedIncome(
           amount: _parseAmountString(t.amount),
           source: t.sender,
@@ -189,14 +199,28 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
         );
       }).toList();
 
-      loadedIncomes.sort((a, b) => b.date.compareTo(a.date));
+      // Load bank statement transactions - ALL organizations
+      final bankStatementTransactions =
+          await BankStatementService.getAllTransactions();
+
+      final bankIncomes = bankStatementTransactions.map((t) {
+        return ParsedIncome(
+          amount: t.amount,
+          source: t.organization,
+          date: t.transactionDate,
+        );
+      }).toList();
+
+      // Combine all transactions
+      final allIncomes = [...smsIncomes, ...bankIncomes];
+      allIncomes.sort((a, b) => b.date.compareTo(a.date));
 
       if (!mounted) return;
 
       setState(() {
         _incomes
           ..clear()
-          ..addAll(loadedIncomes);
+          ..addAll(allIncomes);
 
         _taxResult =
             _incomes.isEmpty ? null : TaxIntelligence.analyze(_totalIncome);
@@ -280,58 +304,72 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   );
 }
 
+void _showBankStatementUploadDialog() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const BankStatementUploadPage(),
+    ),
+  );
+}
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Gig Income Tracker"),
-        actions: widget.appBarActions,
-      ),
-      body: _incomes.isEmpty
-          ? _buildEmptyState()
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Column(
-                      children: [
-                        IncomeSummaryCard(
-                          count: _incomes.length,
-                          total: _totalIncome,
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text("Gig Income Tracker"),
+      actions: widget.appBarActions,
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: _showBankStatementUploadDialog,
+      tooltip: 'Upload Bank Statement',
+      child: const Icon(Icons.add),
+    ),
+    body: _incomes.isEmpty
+        ? _buildEmptyState()
+        : SingleChildScrollView(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    children: [
+                      IncomeSummaryCard(
+                        count: _incomes.length,
+                        total: _totalIncome,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Recent Transactions',
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Recent Transactions',
-                            style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      ..._incomes.take(5).map((income) {
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpacing.md,
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ..._incomes.take(5).map((income) {
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppSpacing.md,
-                            ),
-                            child: TransactionCard(
-                              source: income.source,
-                              amount: income.amount,
-                              date: income.date,
-                            ),
-                          );
-                        }),
-                        if (_incomes.length > 5)
-                          const SizedBox(height: AppSpacing.lg),
-                      ],
-                    ),
+                          child: TransactionCard(
+                            source: income.source,
+                            amount: income.amount,
+                            date: income.date,
+                          ),
+                        );
+                      }),
+                      if (_incomes.length > 5)
+                        const SizedBox(height: AppSpacing.lg),
+                    ],
                   ),
-                  if (_taxResult != null) _buildTaxSection(_taxResult!),
-                ],
-              ),
+                ),
+                if (_taxResult != null) _buildTaxSection(_taxResult!),
+              ],
             ),
-    );
-  }
+          ),
+  );
+}
 
   Widget _buildEmptyState() {
     return Center(
