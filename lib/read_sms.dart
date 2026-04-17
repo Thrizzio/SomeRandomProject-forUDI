@@ -7,9 +7,12 @@ import 'widgets/transaction_card.dart';
 import 'widgets/tax_health_card.dart';
 import 'widgets/suggestion_card.dart';
 import 'widgets/income_summary_card.dart';
+import 'widgets/bank_statement_upload_dialog.dart';
 import 'theme/app_spacing.dart';
 import 'services/database_service.dart';
+import 'services/bank_statement_service.dart';
 import 'models/transaction.dart' as app_models;
+import 'screens/bank_statement/bank_statement_screen.dart';
 
 // --- Model ---
 
@@ -128,17 +131,23 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
 
-  final _numFmt = NumberFormat('#,##,##0.00', 'en_IN');
-  final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
-
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
   @override
   void initState() {
     super.initState();
+    _initializeBankStatementDatabase();
     _loadSavedTransactions();
     startListening();
+  }
+
+  Future<void> _initializeBankStatementDatabase() async {
+    try {
+      await BankStatementService.initBankStatementTable();
+    } catch (e) {
+      debugPrint('Failed to initialize bank statement table: $e');
+    }
   }
 
   Future<void> _loadSavedTransactions() async {
@@ -236,12 +245,134 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
     );
   }
 
+  void _showBankStatementUploadDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => BankStatementUploadDialog(
+        onUploadComplete: (count) {
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully uploaded $count transactions'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          // Optionally navigate to bank statement screen
+          _navigateToBankStatement();
+        },
+      ),
+    );
+  }
+
+  void _navigateToBankStatement() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.7,
+        child: _buildBankStatementBottomSheet(),
+      ),
+    );
+  }
+
+  Widget _buildBankStatementBottomSheet() {
+    return FutureBuilder<List<String>>(
+      future: BankStatementService.getUniqueOrganizations(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error: ${snapshot.error}'),
+          );
+        }
+
+        final organizations = snapshot.data ?? [];
+
+        if (organizations.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                const SizedBox(height: 16),
+                const Text('No bank statements uploaded yet'),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            AppBar(
+              title: const Text('Select Organization'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: organizations.length,
+                itemBuilder: (context, index) {
+                  final org = organizations[index];
+                  return FutureBuilder<double>(
+                    future: BankStatementService.getTotalIncomeByOrganization(org),
+                    builder: (context, incomeSnapshot) {
+                      final income = incomeSnapshot.data ?? 0.0;
+                      final numFmt = NumberFormat('#,##,##0.00', 'en_IN');
+
+                      return ListTile(
+                        title: Text(org),
+                        subtitle: Text(
+                          'Total Income: ₹${numFmt.format(income)}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  BankStatementScreen(organization: org),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Gig Income Tracker"),
         actions: widget.appBarActions,
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showBankStatementUploadDialog,
+        tooltip: 'Upload Bank Statement',
+        child: const Icon(Icons.add),
       ),
       body: _incomes.isEmpty
           ? _buildEmptyState()
