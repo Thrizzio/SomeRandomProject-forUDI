@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
-import 'package:intl/intl.dart';
 
 import 'tax-intelligence/index.dart';
 import 'widgets/transaction_card.dart';
@@ -9,7 +8,9 @@ import 'widgets/suggestion_card.dart';
 import 'widgets/income_summary_card.dart';
 import 'theme/app_spacing.dart';
 import 'services/database_service.dart';
+import 'services/bank_statement_service.dart';
 import 'models/transaction.dart' as app_models;
+import 'screens/bank_statement/bank_statement_upload_page.dart';
 
 // --- Model ---
 
@@ -247,25 +248,32 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
 
-  final _numFmt = NumberFormat('#,##,##0.00', 'en_IN');
-  final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
-
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
   @override
   void initState() {
     super.initState();
+    _initializeBankStatementDatabase();
     _loadSavedTransactions();
     startListening();
   }
 
+  Future<void> _initializeBankStatementDatabase() async {
+    try {
+      await BankStatementService.initBankStatementTable();
+    } catch (e) {
+      debugPrint('Failed to initialize bank statement table: $e');
+    }
+  }
+
   Future<void> _loadSavedTransactions() async {
     try {
-      final transactions =
+      // Load SMS transactions
+      final smsTransactions =
           await DatabaseService.getTransactionsByType('income');
 
-      final loadedIncomes = transactions.map((t) {
+      final smsIncomes = smsTransactions.map((t) {
         return ParsedIncome(
           amount: _parseAmountString(t.amount),
           source: t.sender,
@@ -273,14 +281,28 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
         );
       }).toList();
 
-      loadedIncomes.sort((a, b) => b.date.compareTo(a.date));
+      // Load bank statement transactions - ALL organizations
+      final bankStatementTransactions =
+          await BankStatementService.getAllTransactions();
+
+      final bankIncomes = bankStatementTransactions.map((t) {
+        return ParsedIncome(
+          amount: t.amount,
+          source: t.organization,
+          date: t.transactionDate,
+        );
+      }).toList();
+
+      // Combine all transactions
+      final allIncomes = [...smsIncomes, ...bankIncomes];
+      allIncomes.sort((a, b) => b.date.compareTo(a.date));
 
       if (!mounted) return;
 
       setState(() {
         _incomes
           ..clear()
-          ..addAll(loadedIncomes);
+          ..addAll(allIncomes);
 
         _taxResult =
             _incomes.isEmpty ? null : TaxIntelligence.analyze(_totalIncome);
@@ -377,6 +399,15 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
     }
   }
 
+  void _showBankStatementUploadDialog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const BankStatementUploadPage(),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -386,12 +417,10 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
         actions: widget.appBarActions,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (context) => AddIncomeDialog(onSave: _addManualIncome),
-        ),
-        backgroundColor: Colors.green.shade700,
-        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: _showBankStatementUploadDialog,
+        tooltip: 'Upload Bank Statement',
+        child: const Icon(Icons.add),
+
       ),
       body: _incomes.isEmpty
           ? _buildEmptyState()
