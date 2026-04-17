@@ -70,9 +70,6 @@ class TransactionCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Chevron
-              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
             ],
           ),
         ),
