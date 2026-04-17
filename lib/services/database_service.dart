@@ -118,7 +118,7 @@ class DatabaseService {
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
-        where: 'userEmail = ?',
+        where: 'userEmail = ? OR userEmail IS NULL',
         whereArgs: [userEmail],
         orderBy: 'date DESC',
       );
@@ -139,7 +139,7 @@ class DatabaseService {
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
-        where: 'transactionType = ? AND userEmail = ?',
+        where: 'transactionType = ? AND (userEmail = ? OR userEmail IS NULL)',
         whereArgs: [transactionType, userEmail],
         orderBy: 'date DESC',
       );
@@ -160,7 +160,7 @@ class DatabaseService {
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
-        where: 'date BETWEEN ? AND ? AND userEmail = ?',
+        where: 'date BETWEEN ? AND ? AND (userEmail = ? OR userEmail IS NULL)',
         whereArgs: [
           startDate.toIso8601String(),
           endDate.toIso8601String(),
@@ -183,7 +183,7 @@ class DatabaseService {
       if (userEmail == null) return 0;
       
       final result =
-          await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName WHERE userEmail = ?', [userEmail]);
+          await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName WHERE userEmail = ? OR userEmail IS NULL', [userEmail]);
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
       rethrow;
@@ -199,7 +199,7 @@ class DatabaseService {
       if (userEmail == null) return 0.0;
       
       final result = await db.rawQuery(
-        'SELECT SUM(CAST(SUBSTR(amount, 2) AS REAL)) as total FROM $_tableName WHERE transactionType = ? AND userEmail = ?',
+        'SELECT SUM(CAST(SUBSTR(amount, 2) AS REAL)) as total FROM $_tableName WHERE transactionType = ? AND (userEmail = ? OR userEmail IS NULL)',
         [transactionType, userEmail],
       );
       final total = result.isNotEmpty ? result[0]['total'] : 0;
