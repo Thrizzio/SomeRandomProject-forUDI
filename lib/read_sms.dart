@@ -112,6 +112,125 @@ class SmsParser {
   }
 }
 
+// --- Add Income Dialog ---
+
+class AddIncomeDialog extends StatefulWidget {
+  final Function(double amount, String source) onSave;
+  const AddIncomeDialog({required this.onSave, super.key});
+
+  @override
+  State<AddIncomeDialog> createState() => _AddIncomeDialogState();
+}
+
+class _AddIncomeDialogState extends State<AddIncomeDialog> {
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _sourceController = TextEditingController();
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _sourceController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    setState(() => _errorMessage = null);
+
+    final amountText = _amountController.text.trim();
+    final source = _sourceController.text.trim();
+
+    if (amountText.isEmpty) {
+      setState(() => _errorMessage = 'Amount is required');
+      return;
+    }
+
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      setState(() => _errorMessage = 'Enter a valid amount > 0');
+      return;
+    }
+
+    if (source.isEmpty) {
+      setState(() => _errorMessage = 'Source is required');
+      return;
+    }
+
+    Navigator.pop(context);
+    widget.onSave(amount, source);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add Income',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Amount',
+                hintText: 'e.g., 5000',
+                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _sourceController,
+              decoration: InputDecoration(
+                labelText: 'Source',
+                hintText: 'e.g., Freelance, Client',
+                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                color: Colors.red.shade50,
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text('Add'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // --- Screen ---
 
 class ReadSmsScreen extends StatefulWidget {
@@ -312,7 +431,7 @@ void _showBankStatementUploadDialog() {
   );
 }
 
- @override
+@override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
@@ -346,13 +465,11 @@ Widget build(BuildContext context) {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-
                       Text(
                         'Rendered items: ${_incomes.length}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: AppSpacing.sm),
-
                       ..._incomes.map((income) {
                         return Padding(
                           padding: const EdgeInsets.only(
@@ -374,6 +491,37 @@ Widget build(BuildContext context) {
           ),
   );
 }
+//                         ),
+//                       ),
+//                       const SizedBox(height: AppSpacing.md),
+
+//                       Text(
+//                         'Rendered items: ${_incomes.length}',
+//                         style: Theme.of(context).textTheme.bodySmall,
+//                       ),
+//                       const SizedBox(height: AppSpacing.sm),
+
+//                       ..._incomes.map((income) {
+//                         return Padding(
+//                           padding: const EdgeInsets.only(
+//                             bottom: AppSpacing.md,
+//                           ),
+//                           child: TransactionCard(
+//                             source: income.source,
+//                             amount: income.amount,
+//                             date: income.date,
+//                           ),
+//                         );
+//                       }).toList(),
+//                     ],
+//                   ),
+//                 ),
+//                 if (_taxResult != null) _buildTaxSection(_taxResult!),
+//               ],
+//             ),
+//           ),
+//   );
+// }
 
   Widget _buildEmptyState() {
     return Center(
