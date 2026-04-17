@@ -256,29 +256,28 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     }
   }
 
-  Future<void> _onNewIncome(
-    ParsedIncome income, {
-    String messageBody = 'Parsed SMS income',
-  }) async {
-    setState(() {
-      final alreadyExists = _incomes.any(
-        (item) =>
-            item.amount == income.amount &&
-            item.source == income.source &&
-            item.date.millisecondsSinceEpoch ==
-                income.date.millisecondsSinceEpoch,
-      );
+ Future<void> _onNewIncome(
+  ParsedIncome income, {
+  String messageBody = 'Parsed SMS income',
+}) async {
+  final alreadyExists = _incomes.any(
+    (item) =>
+        item.amount == income.amount &&
+        item.source == income.source &&
+        item.date.millisecondsSinceEpoch ==
+            income.date.millisecondsSinceEpoch,
+  );
 
-      if (!alreadyExists) {
-        _incomes.insert(0, income);
-        _incomes.sort((a, b) => b.date.compareTo(a.date));
-      }
+  if (alreadyExists) return;
 
-      _taxResult = TaxIntelligence.analyze(_totalIncome);
-    });
+  setState(() {
+    _incomes.insert(0, income);
+    _incomes.sort((a, b) => b.date.compareTo(a.date));
+    _taxResult = TaxIntelligence.analyze(_totalIncome);
+  });
 
-    await _saveIncomeToDatabase(income, messageBody: messageBody);
-  }
+  await _saveIncomeToDatabase(income, messageBody: messageBody);
+}
 
   Future<void> startListening() async {
   final bool? permissionsGranted =
@@ -313,7 +312,7 @@ void _showBankStatementUploadDialog() {
   );
 }
 
-  @override
+ @override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
@@ -347,7 +346,14 @@ Widget build(BuildContext context) {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      ..._incomes.take(5).map((income) {
+
+                      Text(
+                        'Rendered items: ${_incomes.length}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      ..._incomes.map((income) {
                         return Padding(
                           padding: const EdgeInsets.only(
                             bottom: AppSpacing.md,
@@ -358,9 +364,7 @@ Widget build(BuildContext context) {
                             date: income.date,
                           ),
                         );
-                      }),
-                      if (_incomes.length > 5)
-                        const SizedBox(height: AppSpacing.lg),
+                      }).toList(),
                     ],
                   ),
                 ),
