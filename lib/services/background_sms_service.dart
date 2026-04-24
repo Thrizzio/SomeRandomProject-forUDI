@@ -161,20 +161,15 @@ class BackgroundSmsService {
   /// Store parsed transaction in database
   Future<void> _storeTransaction(ParsedIncome parsedIncome) async {
     try {
-      final dbService = DatabaseService();
-      await dbService.initialize();
-
       final transaction = app_models.Transaction(
-        id: 'sms_${parsedIncome.date.millisecondsSinceEpoch}',
-        description: 'Income from ${parsedIncome.source}',
-        amount: parsedIncome.amount,
+        amount: parsedIncome.amount.toString(),
+        sender: parsedIncome.source,
+        messageBody: 'Gig income from ${parsedIncome.source}',
+        transactionType: 'income',
         date: parsedIncome.date,
-        category: parsedIncome.source,
-        type: 'income',
-        source: 'sms',
       );
 
-      await dbService.insertTransaction(transaction);
+      await DatabaseService.insertTransaction(transaction);
       debugPrint('✅ Transaction inserted into database');
     } catch (e) {
       debugPrint('❌ Error storing transaction: $e');
