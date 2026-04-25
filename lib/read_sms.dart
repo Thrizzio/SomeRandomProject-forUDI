@@ -112,6 +112,239 @@ class SmsParser {
   }
 }
 
+// --- Transaction Model ---
+
+class ParsedSms {
+  final String source;
+  final double amount;
+  final bool isCredit;
+
+  ParsedSms({
+    required this.source,
+    required this.amount,
+    required this.isCredit,
+  });
+}
+
+// --- Ultra-Minimal Demo Screen (No Pills, Brutalist Design) ---
+
+class DemoSmsListScreen extends StatefulWidget {
+  const DemoSmsListScreen({super.key});
+
+  @override
+  State<DemoSmsListScreen> createState() => _DemoSmsListScreenState();
+}
+
+class _DemoSmsListScreenState extends State<DemoSmsListScreen> {
+  late final List<ParsedSms> _demoTransactions;
+  late List<ParsedSms> _allTransactions;
+
+  @override
+  void initState() {
+    super.initState();
+    _demoTransactions = _parseDemoMessages();
+    _allTransactions = List.from(_demoTransactions);
+  }
+
+  static const List<String> _demoMessages = [
+    "Acct XX123 credited with Rs. 5,000 from SWIGGY on 15 Apr. Avl bal Rs. 25,490",
+    "INR 2,500 received via UPI from FreelanceClient. Ref: 234567. Bal Rs. 27,990",
+    "₹1,200 debited for fuel. Txn ID: 998877. Avl balance Rs. 24,790",
+    "ZOMATO order of ₹850 debited from your account. Bal Rs. 23,940",
+    "₹12,500 transferred to UBER. Ref no: 556677. Balance Rs. 11,440",
+    "Payment of Rs. 3,200 to AMAZON successful. Avl bal Rs. 8,240",
+    "Rs. 8,000 credited from UBER weekly payout. Ref: 778899. Bal Rs. 16,240",
+    "INR 15,000 received for freelance project. Txn ID: 112233. Bal Rs. 31,240",
+    "₹5,500 bank transfer received from CLIENT. Avl Rs. 36,740",
+    "Rs. 25,000 credited for Interior Design project. Ref: 445566. Bal Rs. 61,740",
+    "UPI received ₹3,750 from HARPREET. UPI Ref: 667788. Bal Rs. 65,490",
+    "SWIGGY delivery earnings: Rs. 4,200 credited. Avl Rs. 69,690",
+    "₹2,100 debited for ZOMATO subscription. Txn ID: 889900. Bal Rs. 67,590",
+    "Rs. 18,000 credited from TECHCORP freelance payment. Ref: 223344. Bal Rs. 85,590",
+    "UPI transfer INR 1,500 to SHARMA. Ref: 998822. Avl Rs. 84,090",
+  ];
+
+  List<ParsedSms> _parseDemoMessages() {
+    final results = <ParsedSms>[];
+    for (int i = 0; i < _demoMessages.length; i++) {
+      final message = _demoMessages[i];
+      try {
+        final amount = SmsParser.extractAmount(message);
+        if (amount == null || amount <= 0) continue;
+
+        final isCredit = SmsParser.isIncomeMessage(message);
+        final source = SmsParser.extractSource(message);
+
+        results.add(ParsedSms(source: source, amount: amount, isCredit: isCredit));
+      } catch (e) {
+        debugPrint('Parse error at message ${i + 1}: $e');
+      }
+    }
+    return results;
+  }
+
+  double get _totalIncome =>
+      _allTransactions.where((t) => t.isCredit).fold(0, (sum, t) => sum + t.amount);
+
+  double get _totalExpense =>
+      _allTransactions.where((t) => !t.isCredit).fold(0, (sum, t) => sum + t.amount);
+
+  double get _netBalance => _totalIncome - _totalExpense;
+
+  @override
+  Widget build(BuildContext context) {
+    final transactions = _allTransactions;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Transactions'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.black12, height: 1),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddIncomeDialog(context),
+        backgroundColor: Colors.green.shade700,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: transactions.isEmpty
+          ? const Center(child: Text('No transactions found'))
+          : Column(
+              children: [
+                // Stats Bar
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Colors.black12)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatItem('Income', _totalIncome, Colors.green.shade700),
+                      _buildStatItem('Expense', _totalExpense, Colors.red.shade700),
+                      _buildStatItem('Balance', _netBalance, Colors.black87),
+                    ],
+                  ),
+                ),
+                // Transactions List
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: transactions.length,
+                    itemBuilder: (context, index) {
+                      final txn = transactions[index];
+                      return _buildTransactionRow(txn);
+                    },
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  void _showAddIncomeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AddIncomeDialog(
+        onSave: _addNewIncome,
+      ),
+    );
+  }
+
+  Future<void> _addNewIncome(double amount, String source) async {
+    try {
+      final transaction = app_models.Transaction(
+        amount: amount.toString(),
+        sender: source,
+        messageBody: 'Manual income entry',
+        transactionType: 'income',
+        date: DateTime.now(),
+      );
+
+      await DatabaseService.insertTransaction(transaction);
+
+      if (!mounted) return;
+
+      // Add to UI list
+      setState(() {
+        _allTransactions.insert(
+          0,
+          ParsedSms(
+            source: source,
+            amount: amount,
+            isCredit: true,
+          ),
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Income added successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Widget _buildStatItem(String label, double amount, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+        const SizedBox(height: 6),
+        Text(
+          '₹${amount.toStringAsFixed(0)}',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionRow(ParsedSms txn) {
+    final color = txn.isCredit ? Colors.green.shade700 : Colors.red.shade700;
+    final prefix = txn.isCredit ? '+' : '−';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.08))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  txn.source,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  txn.isCredit ? 'Credit' : 'Debit',
+                  style: TextStyle(fontSize: 11, color: color),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$prefix₹${txn.amount.toStringAsFixed(2)}',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // --- Add Income Dialog ---
 
 class AddIncomeDialog extends StatefulWidget {
@@ -231,7 +464,7 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
   }
 }
 
-// --- Screen ---
+// --- ReadSmsScreen ---
 
 class ReadSmsScreen extends StatefulWidget {
   const ReadSmsScreen({

@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'services/local_auth_service.dart';
 import 'services/foreground_sms_handler.dart';
 import 'widgets/auth_gate.dart';
+import 'read_sms.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,7 +40,7 @@ class MyApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,
         ),
-        home: const AuthGate(),
+        home: const DemoSmsListScreen(),
       ),
     );
   }
