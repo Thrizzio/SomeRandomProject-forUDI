@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/user_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService authService;
@@ -15,6 +16,23 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> init() async {
     user = await authService.currentUser();
+    
+    // If no active session, try to restore from saved email
+    if (user == null) {
+      final savedEmail = await UserPreferences.getEmail();
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        // Restore user session from saved email
+        user = AppUser(
+  id: savedEmail, // temporary fallback
+  email: savedEmail,
+  createdAt: DateTime.now(),
+);
+      }
+    } else {
+      // Save current user email for persistence
+      await UserPreferences.saveEmail(user!.email);
+    }
+    
     notifyListeners();
   }
 
@@ -24,6 +42,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       user = await authService.login(email, password);
+      if (user != null) {
+        await UserPreferences.saveEmail(user!.email);
+      }
       return user != null;
     } catch (e) {
       error = e.toString();
@@ -53,6 +74,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await authService.logout();
     user = null;
+    await UserPreferences.clearEmail();
     notifyListeners();
   }
 }
