@@ -3,9 +3,16 @@ import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
 import 'services/local_auth_service.dart';
+import 'services/foreground_sms_handler.dart';
 import 'widgets/auth_gate.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize background SMS service
+  final smsHandler = ForegroundSmsHandler();
+  await smsHandler.initialize();
+  
   runApp(const MyApp());
 }
 
