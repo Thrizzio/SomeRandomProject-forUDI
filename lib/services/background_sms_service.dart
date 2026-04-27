@@ -7,11 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../read_sms.dart';
 import '../models/transaction.dart' as app_models;
 import 'database_service.dart';
+import 'app_logger.dart';
 
 /// Background SMS parsing service
 /// Handles SMS listening in both foreground and background modes
 class BackgroundSmsService {
   static final BackgroundSmsService _instance = BackgroundSmsService._internal();
+  static const String _tag = 'BackgroundSmsService';
 
   factory BackgroundSmsService() {
     return _instance;
@@ -32,17 +34,17 @@ class BackgroundSmsService {
   /// Initialize the background SMS service
   Future<void> initialize() async {
     if (_isInitialized) {
-      debugPrint('✅ Background SMS Service already initialized');
+      AppLogger.info(_tag, 'Already initialized');
       return;
     }
 
     try {
-      debugPrint('🚀 Initializing Background SMS Service...');
+      AppLogger.info(_tag, 'Initializing...');
 
       // Check permissions
       final hasPermission = await telephony.requestPhoneAndSmsPermissions ?? false;
       if (!hasPermission) {
-        debugPrint('❌ SMS Permission denied');
+        AppLogger.warning(_tag, 'SMS permission denied');
         return;
       }
 
@@ -69,21 +71,21 @@ class BackgroundSmsService {
       await startListening();
 
       _isInitialized = true;
-      debugPrint('✅ Background SMS Service initialized successfully');
-    } catch (e) {
-      debugPrint('❌ Error initializing Background SMS Service: $e');
+      AppLogger.info(_tag, 'Initialized successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Initialization failed', e, stackTrace);
     }
   }
 
   /// Start listening to incoming SMS messages
   Future<void> startListening() async {
     if (_isListening) {
-      debugPrint('⚠️ SMS Listener already active');
+      AppLogger.warning(_tag, 'Already listening');
       return;
     }
 
     try {
-      debugPrint('📱 Starting SMS listener...');
+      AppLogger.info(_tag, 'Starting listener...');
 
       // Listen to incoming SMS messages in foreground
       _smsSubscription = telephony.onSmsReceived?.listen((SmsMessage message) {
@@ -104,9 +106,9 @@ class BackgroundSmsService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_listenerActiveKey, true);
 
-      debugPrint('✅ SMS Listener started successfully');
-    } catch (e) {
-      debugPrint('❌ Error starting SMS listener: $e');
+      AppLogger.info(_tag, 'Listener started successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to start listener', e, stackTrace);
       _isListening = false;
     }
   }
@@ -114,12 +116,12 @@ class BackgroundSmsService {
   /// Stop listening to SMS messages
   Future<void> stopListening() async {
     if (!_isListening) {
-      debugPrint('⚠️ SMS Listener not active');
+      AppLogger.warning(_tag, 'Not listening');
       return;
     }
 
     try {
-      debugPrint('📵 Stopping SMS listener...');
+      AppLogger.info(_tag, 'Stopping listener...');
       await _smsSubscription?.cancel();
       _smsSubscription = null;
       _isListening = false;
@@ -128,33 +130,34 @@ class BackgroundSmsService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_listenerActiveKey, false);
 
-      debugPrint('✅ SMS Listener stopped');
-    } catch (e) {
-      debugPrint('❌ Error stopping SMS listener: $e');
+      AppLogger.info(_tag, 'Listener stopped');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to stop listener', e, stackTrace);
     }
   }
 
   /// Handle incoming SMS message
   Future<void> _handleIncomingSms(SmsMessage message) async {
     try {
-      debugPrint('📨 Received SMS from: ${message.address}');
+      AppLogger.debug(_tag, 'Received SMS from: ${message.address}');
 
       // Parse the SMS using existing parser
       final parsedIncome = SmsParser.parse(message);
 
       if (parsedIncome == null) {
-        debugPrint('⏭️ SMS not a gig income message, skipping');
+        AppLogger.debug(_tag, 'SMS not a gig income message');
         return;
       }
 
-      debugPrint('✅ Parsed valid gig income: ₹${parsedIncome.amount} from ${parsedIncome.source}');
+      AppLogger.info(_tag,
+          'Parsed gig income: ₹${parsedIncome.amount} from ${parsedIncome.source}');
 
       // Store in database
       await _storeTransaction(parsedIncome);
 
-      debugPrint('💾 Transaction stored successfully');
-    } catch (e) {
-      debugPrint('❌ Error handling incoming SMS: $e');
+      AppLogger.debug(_tag, 'Transaction stored successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to handle incoming SMS', e, stackTrace);
     }
   }
 
@@ -166,13 +169,13 @@ class BackgroundSmsService {
         sender: parsedIncome.source,
         messageBody: 'Gig income from ${parsedIncome.source}',
         transactionType: 'income',
-        date: parsedIncome.date,
+        date: parsedIncome.date.toIso8601String(),
       );
 
       await DatabaseService.insertTransaction(transaction);
-      debugPrint('✅ Transaction inserted into database');
-    } catch (e) {
-      debugPrint('❌ Error storing transaction: $e');
+      AppLogger.debug(_tag, 'Transaction inserted into database');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to store transaction', e, stackTrace);
       rethrow;
     }
   }
@@ -182,8 +185,8 @@ class BackgroundSmsService {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_listenerActiveKey) ?? false;
-    } catch (e) {
-      debugPrint('❌ Error getting listener status: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to get listener status', e, stackTrace);
       return _isListening;
     }
   }
@@ -198,8 +201,8 @@ class BackgroundSmsService {
         'lastCheck': prefs.getString('sms_last_check'),
         'totalProcessed': prefs.getInt('sms_total_processed') ?? 0,
       };
-    } catch (e) {
-      debugPrint('❌ Error getting statistics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to get statistics', e, stackTrace);
       return {
         'error': e.toString(),
       };
@@ -212,9 +215,9 @@ class BackgroundSmsService {
       await stopListening();
       await Workmanager().cancelAll();
       _isInitialized = false;
-      debugPrint('✅ Background SMS Service disposed');
-    } catch (e) {
-      debugPrint('❌ Error disposing Background SMS Service: $e');
+      AppLogger.info(_tag, 'Disposed successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Dispose failed', e, stackTrace);
     }
   }
 }
@@ -224,13 +227,13 @@ void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
     try {
       if (taskName == 'background_sms_parser') {
-        debugPrint('🔄 Background SMS Parser task running...');
+        AppLogger.info('BackgroundTask', 'Background SMS parser task running');
 
         final smsService = BackgroundSmsService();
         final isActive = await smsService.isListenerActive();
 
         if (!isActive) {
-          debugPrint('📵 Listener not active, re-initializing...');
+          AppLogger.info('BackgroundTask', 'Re-initializing listener');
           await smsService.initialize();
         }
 
@@ -241,11 +244,11 @@ void callbackDispatcher() {
           DateTime.now().toIso8601String(),
         );
 
-        debugPrint('✅ Background task completed');
+        AppLogger.info('BackgroundTask', 'Background task completed');
         return true;
       }
     } catch (e) {
-      debugPrint('❌ Background task error: $e');
+      AppLogger.error('BackgroundTask', 'Background task error', e);
       return false;
     }
     return false;

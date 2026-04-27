@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'background_sms_service.dart';
+import 'app_logger.dart';
 
 /// Manager for background SMS service lifecycle and UI interactions
 class ForegroundSmsHandler {
   static final ForegroundSmsHandler _instance = ForegroundSmsHandler._internal();
+  static const String _tag = 'ForegroundSmsHandler';
 
   factory ForegroundSmsHandler() {
     return _instance;
@@ -17,17 +19,17 @@ class ForegroundSmsHandler {
   /// Initialize the foreground SMS handler
   Future<void> initialize() async {
     if (_initialized) {
-      debugPrint('✅ Foreground SMS Handler already initialized');
+      AppLogger.info(_tag, 'Already initialized');
       return;
     }
 
     try {
-      debugPrint('🚀 Initializing Foreground SMS Handler...');
+      AppLogger.info(_tag, 'Initializing...');
       await _smsService.initialize();
       _initialized = true;
-      debugPrint('✅ Foreground SMS Handler initialized');
-    } catch (e) {
-      debugPrint('❌ Error initializing Foreground SMS Handler: $e');
+      AppLogger.info(_tag, 'Initialized successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Initialization failed', e, stackTrace);
     }
   }
 
@@ -35,10 +37,10 @@ class ForegroundSmsHandler {
   Future<bool> enableBackgroundSmsListener() async {
     try {
       await _smsService.startListening();
-      debugPrint('✅ Background SMS listener enabled');
+      AppLogger.info(_tag, 'Background SMS listener enabled');
       return true;
-    } catch (e) {
-      debugPrint('❌ Error enabling background SMS listener: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to enable background SMS listener', e, stackTrace);
       return false;
     }
   }
@@ -47,22 +49,32 @@ class ForegroundSmsHandler {
   Future<bool> disableBackgroundSmsListener() async {
     try {
       await _smsService.stopListening();
-      debugPrint('✅ Background SMS listener disabled');
+      AppLogger.info(_tag, 'Background SMS listener disabled');
       return true;
-    } catch (e) {
-      debugPrint('❌ Error disabling background SMS listener: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to disable background SMS listener', e, stackTrace);
       return false;
     }
   }
 
   /// Check if SMS listener is active
   Future<bool> isListenerActive() async {
-    return await _smsService.isListenerActive();
+    try {
+      return await _smsService.isListenerActive();
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to check listener status', e, stackTrace);
+      return false;
+    }
   }
 
   /// Get SMS service statistics
   Future<Map<String, dynamic>> getServiceStats() async {
-    return await _smsService.getStatistics();
+    try {
+      return await _smsService.getStatistics();
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Failed to get service statistics', e, stackTrace);
+      return {};
+    }
   }
 
   /// Cleanup resources
@@ -70,9 +82,9 @@ class ForegroundSmsHandler {
     try {
       await _smsService.dispose();
       _initialized = false;
-      debugPrint('✅ Foreground SMS Handler disposed');
-    } catch (e) {
-      debugPrint('❌ Error disposing Foreground SMS Handler: $e');
+      AppLogger.info(_tag, 'Disposed successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error(_tag, 'Dispose failed', e, stackTrace);
     }
   }
 }

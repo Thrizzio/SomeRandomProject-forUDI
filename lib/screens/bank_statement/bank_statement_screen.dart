@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/bank_statement_transaction.dart';
+import '../../services/app_logger.dart';
 import '../../services/bank_statement_service.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/error_and_loading_widgets.dart';
 
 class BankStatementScreen extends StatefulWidget {
   final String organization;
@@ -17,6 +19,7 @@ class BankStatementScreen extends StatefulWidget {
 }
 
 class _BankStatementScreenState extends State<BankStatementScreen> {
+  static const String _tag = 'BankStatementScreen';
   late Future<List<BankStatementTransaction>> _transactionsFuture;
   final _numFmt = NumberFormat('#,##,##0.00', 'en_IN');
   final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
@@ -24,8 +27,17 @@ class _BankStatementScreenState extends State<BankStatementScreen> {
   @override
   void initState() {
     super.initState();
+    AppLogger.info(_tag, 'Loading organization: ${widget.organization}');
     _transactionsFuture =
         BankStatementService.getTransactionsByOrganization(widget.organization);
+  }
+
+  Future<void> _retryLoad() async {
+    AppLogger.info(_tag, 'Retry loading for ${widget.organization}');
+    setState(() {
+      _transactionsFuture =
+          BankStatementService.getTransactionsByOrganization(widget.organization);
+    });
   }
 
   double _calculateIncome(List<BankStatementTransaction> transactions) {
@@ -41,39 +53,27 @@ class _BankStatementScreenState extends State<BankStatementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.organization} - Bank Statement'),
-        elevation: 0,
+      appBar: ProductionAppBar(
+        title: '${widget.organization} - Bank Statement',
       ),
       body: FutureBuilder<List<BankStatementTransaction>>(
         future: _transactionsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingIndicator(message: 'Loading transactions...');
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Error loading transactions',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    snapshot.error.toString(),
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+            AppLogger.error(
+              _tag,
+              'Failed loading transactions for ${widget.organization}',
+              snapshot.error,
+            );
+            return Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: ErrorDisplay(
+                error: 'Error loading transactions: ${snapshot.error}',
+                onRetry: _retryLoad,
               ),
             );
           }
@@ -81,28 +81,12 @@ class _BankStatementScreenState extends State<BankStatementScreen> {
           final transactions = snapshot.data ?? [];
 
           if (transactions.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'No transactions found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'No payments received from ${widget.organization}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+            return EmptyStateWidget(
+              title: 'No transactions found',
+              message: 'No payments received from ${widget.organization}',
+              icon: Icons.receipt_long_outlined,
+              onAction: _retryLoad,
+              actionLabel: 'Refresh',
             );
           }
 
