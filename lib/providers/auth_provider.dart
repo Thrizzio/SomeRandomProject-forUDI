@@ -16,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Initialize auth provider - restores user session if available
   Future<void> init() async {
+    
     loading = true;
     error = null;
     notifyListeners();
@@ -26,6 +27,20 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         // User is already logged in via Firebase
         await UserPreferences.saveEmail(user!.email);
+        
+    user = await authService.currentUser();
+    
+    // If no active session, try to restore from saved email
+    if (user == null) {
+      final savedEmail = await UserPreferences.getEmail();
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        // Restore user session from saved email
+        user = AppUser(
+  id: savedEmail, // temporary fallback
+  email: savedEmail,
+  createdAt: DateTime.now(),
+);
+        
       }
     } catch (e) {
       error = 'Failed to restore session: $e';

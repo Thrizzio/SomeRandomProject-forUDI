@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 import 'tax-intelligence/index.dart';
 import 'widgets/transaction_card.dart';
@@ -318,9 +320,34 @@ class ReadSmsScreen extends StatefulWidget {
   State<ReadSmsScreen> createState() => _ReadSmsScreenState();
 }
 
+
 class _ReadSmsScreenState extends State<ReadSmsScreen> {
   static const String _tag = 'ReadSmsScreen';
 
+=======
+@pragma('vm:entry-point')
+Future<void> smsBackgroundHandler(SmsMessage message) async {
+  try {
+    final parsed = SmsParser.parse(message);
+    if (parsed == null) return;
+
+    await DatabaseService.insertTransaction(
+      app_models.Transaction(
+        amount: parsed.amount.toString(),
+        sender: parsed.source,
+        messageBody: message.body ?? 'Parsed SMS income',
+        transactionType: 'income',
+        date: parsed.date,
+      ),
+    );
+  } catch (e) {
+    debugPrint('Background SMS handler failed: $e');
+  }
+}
+
+class _ReadSmsScreenState extends State<ReadSmsScreen>
+    with WidgetsBindingObserver 
+  
   final Telephony telephony = Telephony.instance;
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
@@ -329,6 +356,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
 
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
+
 
   @override
   void initState() {
@@ -355,7 +383,29 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
         });
       }
     }
+
+@override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addObserver(this);
+  _initializeBankStatementDatabase();
+  _loadSavedTransactions();
+  startListening();
+}
+
+@override
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  super.dispose();
+}
+
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed) {
+    _loadSavedTransactions();
+
   }
+}
 
   Future<void> _initializeBankStatementDatabase() async {
     try {
@@ -460,6 +510,7 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
       AppLogger.error(_tag, 'Failed to save transaction', e, stackTrace);
     }
   }
+
 
   Future<void> _onNewIncome(
     ParsedIncome income, {
@@ -674,13 +725,155 @@ class _ReadSmsScreenState extends State<ReadSmsScreen> {
                           ),
                       ],
                     ),
-                  ),
-                  if (_taxResult != null) _buildTaxSection(_taxResult!),
-                ],
-              ),
-            ),
-    );
+
+ Future<void> _onNewIncome(
+  ParsedIncome income, {
+  String messageBody = 'Parsed SMS income',
+}) async {
+  final alreadyExists = _incomes.any(
+    (item) =>
+        item.amount == income.amount &&
+        item.source == income.source &&
+        item.date.millisecondsSinceEpoch ==
+            income.date.millisecondsSinceEpoch,
+  );
+
+  if (alreadyExists) return;
+
+  setState(() {
+    _incomes.insert(0, income);
+    _incomes.sort((a, b) => b.date.compareTo(a.date));
+    _taxResult = TaxIntelligence.analyze(_totalIncome);
+  });
+
+  await _saveIncomeToDatabase(income, messageBody: messageBody);
+}
+
+  Future<void> startListening() async {
+  final bool? permissionsGranted =
+      await telephony.requestPhoneAndSmsPermissions;
+
+  if (permissionsGranted != true) {
+    debugPrint('SMS permissions not granted');
+    return;
   }
+
+  telephony.listenIncomingSms(
+    onNewMessage: (SmsMessage message) async {
+      final parsed = SmsParser.parse(message);
+      if (parsed != null) {
+        await _onNewIncome(
+          parsed,
+          messageBody: message.body ?? 'Parsed SMS income',
+        );
+      }
+    },
+    onBackgroundMessage: smsBackgroundHandler,
+    listenInBackground: true,
+  );
+}
+
+void _showBankStatementUploadDialog() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const BankStatementUploadPage(),
+    ),
+  );
+}
+
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text("Gig Income Tracker"),
+      actions: widget.appBarActions,
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: _showBankStatementUploadDialog,
+      tooltip: 'Upload Bank Statement',
+      child: const Icon(Icons.add),
+    ),
+    body: _incomes.isEmpty
+        ? _buildEmptyState()
+        : SingleChildScrollView(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    children: [
+                      IncomeSummaryCard(
+                        count: _incomes.length,
+                        total: _totalIncome,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Recent Transactions',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Rendered items: ${_incomes.length}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      ..._incomes.map((income) {
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpacing.md,
+                          ),
+                          child: TransactionCard(
+                            source: income.source,
+                            amount: income.amount,
+                            date: income.date,
+                          ),
+                        );
+                      }).toList(),
+                    ],
+
+                  ),
+                ),
+                if (_taxResult != null) _buildTaxSection(_taxResult!),
+              ],
+            ),
+          ),
+  );
+}
+//                         ),
+//                       ),
+//                       const SizedBox(height: AppSpacing.md),
+
+//                       Text(
+//                         'Rendered items: ${_incomes.length}',
+//                         style: Theme.of(context).textTheme.bodySmall,
+//                       ),
+//                       const SizedBox(height: AppSpacing.sm),
+
+//                       ..._incomes.map((income) {
+//                         return Padding(
+//                           padding: const EdgeInsets.only(
+//                             bottom: AppSpacing.md,
+//                           ),
+//                           child: TransactionCard(
+//                             source: income.source,
+//                             amount: income.amount,
+//                             date: income.date,
+//                           ),
+//                         );
+//                       }).toList(),
+//                     ],
+//                   ),
+//                 ),
+//                 if (_taxResult != null) _buildTaxSection(_taxResult!),
+//               ],
+//             ),
+//           ),
+//   );
+// }
 
   Widget _buildEmptyState() {
     return EmptyStateWidget(
