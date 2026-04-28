@@ -1,7 +1,5 @@
-import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:telephony/telephony.dart';
+import 'package:telephony/telephony.dart' hide NetworkType;
 import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../read_sms.dart';
@@ -22,7 +20,6 @@ class BackgroundSmsService {
   BackgroundSmsService._internal();
 
   final Telephony telephony = Telephony.instance;
-  StreamSubscription<SmsMessage>? _smsSubscription;
   bool _isInitialized = false;
   bool _isListening = false;
 
@@ -60,10 +57,10 @@ class BackgroundSmsService {
         _taskName,
         frequency: _checkInterval,
         constraints: Constraints(
+          networkType: NetworkType.not_required,
           requiresBatteryNotLow: false,
           requiresCharging: false,
           requiresDeviceIdle: false,
-          requiresNetwork: false,
         ),
       );
 
@@ -87,13 +84,7 @@ class BackgroundSmsService {
     try {
       AppLogger.info(_tag, 'Starting listener...');
 
-      // Listen to incoming SMS messages in foreground
-      _smsSubscription = telephony.onSmsReceived?.listen((SmsMessage message) {
-        _handleIncomingSms(message);
-      });
-
-      // Also listen to SMS from the background
-      await telephony.listenIncomingSms(
+      telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) {
           _handleIncomingSms(message);
         },
@@ -120,10 +111,8 @@ class BackgroundSmsService {
       return;
     }
 
-    try {
-      AppLogger.info(_tag, 'Stopping listener...');
-      await _smsSubscription?.cancel();
-      _smsSubscription = null;
+      try {
+        AppLogger.info(_tag, 'Stopping listener...');
       _isListening = false;
 
       // Save listener state
