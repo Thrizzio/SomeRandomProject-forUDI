@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:telephony/telephony.dart';
+import 'package:telephony/telephony.dart' hide NetworkType;
 import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../read_sms.dart';
@@ -22,7 +22,6 @@ class BackgroundSmsService {
   BackgroundSmsService._internal();
 
   final Telephony telephony = Telephony.instance;
-  StreamSubscription<SmsMessage>? _smsSubscription;
   bool _isInitialized = false;
   bool _isListening = false;
 
@@ -60,10 +59,10 @@ class BackgroundSmsService {
         _taskName,
         frequency: _checkInterval,
         constraints: Constraints(
+          networkType: NetworkType.not_required,
           requiresBatteryNotLow: false,
           requiresCharging: false,
           requiresDeviceIdle: false,
-          requiresNetwork: false,
         ),
       );
 
@@ -87,16 +86,12 @@ class BackgroundSmsService {
     try {
       AppLogger.info(_tag, 'Starting listener...');
 
-      // Listen to incoming SMS messages in foreground
-      _smsSubscription = telephony.onSmsReceived?.listen((SmsMessage message) {
-        _handleIncomingSms(message);
-      });
-
-      // Also listen to SMS from the background
-      await telephony.listenIncomingSms(
+      // Listen to incoming SMS messages in foreground/background using telephony
+      telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) {
           _handleIncomingSms(message);
         },
+        onBackgroundMessage: telephonyBackgroundHandler,
         listenInBackground: true,
       );
 
@@ -122,8 +117,6 @@ class BackgroundSmsService {
 
     try {
       AppLogger.info(_tag, 'Stopping listener...');
-      await _smsSubscription?.cancel();
-      _smsSubscription = null;
       _isListening = false;
 
       // Save listener state
@@ -139,6 +132,12 @@ class BackgroundSmsService {
   /// Handle incoming SMS message
   Future<void> _handleIncomingSms(SmsMessage message) async {
     try {
+      final isActive = await isListenerActive();
+      if (!isActive && !_isListening) {
+        AppLogger.debug(_tag, 'Ignored SMS: listener is not active');
+        return;
+      }
+
       AppLogger.debug(_tag, 'Received SMS from: ${message.address}');
 
       // Parse the SMS using existing parser
@@ -253,4 +252,11 @@ void callbackDispatcher() {
     }
     return false;
   });
+}
+
+/// Global background SMS handler for Telephony
+@pragma('vm:entry-point')
+void telephonyBackgroundHandler(SmsMessage message) {
+  // Delegate background messages to our service's handler
+  BackgroundSmsService()._handleIncomingSms(message);
 }
