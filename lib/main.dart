@@ -6,9 +6,13 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/ui_state_provider.dart';
 import 'services/app_logger.dart';
+import 'services/auth_service.dart';
 import 'services/firebase_auth_service.dart';
+import 'services/local_auth_service.dart';
 import 'services/foreground_sms_handler.dart';
 import 'widgets/auth_gate.dart';
+
+bool isFirebaseInitialized = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +22,10 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    isFirebaseInitialized = true;
   } catch (e) {
-    AppLogger.error('main', 'Firebase initialization error', e);
+    AppLogger.warning('main', 'Firebase initialization error (using local mock auth/db fallback): $e');
+    isFirebaseInitialized = false;
   }
 
   // Initialize background SMS service
@@ -40,12 +46,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<FirebaseAuthService>(
-          create: (_) => FirebaseAuthService(),
+        Provider<AuthService>(
+          create: (_) => isFirebaseInitialized ? FirebaseAuthService() : LocalAuthService(),
         ),
         ChangeNotifierProvider<AuthProvider>(
           create: (context) => AuthProvider(
-            authService: context.read<FirebaseAuthService>(),
+            authService: context.read<AuthService>(),
           )..init(), // Initialize auth on app startup
         ),
         ChangeNotifierProvider<UiStateProvider>(
@@ -64,3 +70,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
