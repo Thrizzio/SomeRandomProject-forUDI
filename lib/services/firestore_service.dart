@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import '../models/transaction.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -193,10 +194,14 @@ class FirestoreService {
             })
             .whereType<Transaction>()
             .toList())
-        .handleError((error) {
-          print('Error in transactions stream: $error');
-          return [];
-        });
+        .transform(
+          StreamTransformer<List<Transaction>, List<Transaction>>.fromHandlers(
+            handleError: (error, stackTrace, sink) {
+              print('Error in transactions stream: $error');
+              sink.add(<Transaction>[]);
+            },
+          ),
+        );
   }
 
   /// Save bank statement transactions in bulk
