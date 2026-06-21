@@ -1,28 +1,49 @@
-
 import 'dart:async';
-
-
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import '../models/transaction.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'app_logger.dart';
 
-/// Production-ready Firestore database service
+/// Production-ready Firestore database service with fallback safety
 class FirestoreService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseFirestore? get _firestore {
+    try {
+      return FirebaseFirestore.instance;
+    } catch (e) {
+      AppLogger.warning('FirestoreService', 'Firestore is not initialized: $e');
+      return null;
+    }
+  }
+
+  FirebaseAuth? get _auth {
+    try {
+      return FirebaseAuth.instance;
+    } catch (e) {
+      AppLogger.warning('FirestoreService', 'FirebaseAuth is not initialized: $e');
+      return null;
+    }
+  }
 
   /// Get current user ID
-  String? get _userId => _auth.currentUser?.uid;
+  String? get _userId {
+    try {
+      return _auth?.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Add transaction to Firestore
   Future<String> addTransaction(Transaction transaction) async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
-        throw Exception('User not authenticated');
+      if (db == null || userId == null) {
+        AppLogger.warning('FirestoreService', 'Cannot add transaction: Firebase not available');
+        return '';
       }
 
-      final docRef = await _firestore
+      final docRef = await db
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -37,19 +58,21 @@ class FirestoreService {
 
       return docRef.id;
     } catch (e) {
-      throw Exception('Failed to add transaction: $e');
+      AppLogger.error('FirestoreService', 'Failed to add transaction', e);
+      return '';
     }
   }
 
   /// Get all transactions for current user
   Future<List<Transaction>> getTransactions() async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
+      if (db == null || userId == null) {
         return [];
       }
 
-      final snapshot = await _firestore
+      final snapshot = await db
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -64,27 +87,28 @@ class FirestoreService {
                 'id': doc.id,
               });
             } catch (e) {
-              // Log but don't fail entire operation
-              print('Error parsing transaction ${doc.id}: $e');
+              AppLogger.error('FirestoreService', 'Error parsing transaction ${doc.id}', e);
               return null;
             }
           })
           .whereType<Transaction>()
           .toList();
     } catch (e) {
-      throw Exception('Failed to fetch transactions: $e');
+      AppLogger.error('FirestoreService', 'Failed to fetch transactions', e);
+      return [];
     }
   }
 
   /// Get transactions by type
   Future<List<Transaction>> getTransactionsByType(String type) async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
+      if (db == null || userId == null) {
         return [];
       }
 
-      final snapshot = await _firestore
+      final snapshot = await db
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -100,14 +124,15 @@ class FirestoreService {
                 'id': doc.id,
               });
             } catch (e) {
-              print('Error parsing transaction ${doc.id}: $e');
+              AppLogger.error('FirestoreService', 'Error parsing transaction ${doc.id}', e);
               return null;
             }
           })
           .whereType<Transaction>()
           .toList();
     } catch (e) {
-      throw Exception('Failed to fetch transactions by type: $e');
+      AppLogger.error('FirestoreService', 'Failed to fetch transactions by type', e);
+      return [];
     }
   }
 
@@ -117,12 +142,13 @@ class FirestoreService {
     DateTime endDate,
   ) async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
+      if (db == null || userId == null) {
         return [];
       }
 
-      final snapshot = await _firestore
+      final snapshot = await db
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -140,44 +166,47 @@ class FirestoreService {
                 'id': doc.id,
               });
             } catch (e) {
-              print('Error parsing transaction ${doc.id}: $e');
+              AppLogger.error('FirestoreService', 'Error parsing transaction ${doc.id}', e);
               return null;
             }
           })
           .whereType<Transaction>()
           .toList();
     } catch (e) {
-      throw Exception('Failed to fetch transactions by date range: $e');
+      AppLogger.error('FirestoreService', 'Failed to fetch transactions by date range', e);
+      return [];
     }
   }
 
   /// Delete transaction
   Future<void> deleteTransaction(String transactionId) async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
-        throw Exception('User not authenticated');
+      if (db == null || userId == null) {
+        return;
       }
 
-      await _firestore
+      await db
           .collection('users')
           .doc(userId)
           .collection('transactions')
           .doc(transactionId)
           .delete();
     } catch (e) {
-      throw Exception('Failed to delete transaction: $e');
+      AppLogger.error('FirestoreService', 'Failed to delete transaction', e);
     }
   }
 
   /// Get real-time stream of transactions
   Stream<List<Transaction>> getTransactionsStream() {
+    final db = _firestore;
     final userId = _userId;
-    if (userId == null) {
+    if (db == null || userId == null) {
       return Stream.value([]);
     }
 
-    return _firestore
+    return db
         .collection('users')
         .doc(userId)
         .collection('transactions')
@@ -191,7 +220,7 @@ class FirestoreService {
                   'id': doc.id,
                 });
               } catch (e) {
-                print('Error parsing transaction ${doc.id}: $e');
+                AppLogger.error('FirestoreService', 'Error parsing transaction ${doc.id}', e);
                 return null;
               }
             })
@@ -200,7 +229,7 @@ class FirestoreService {
         .transform(
           StreamTransformer<List<Transaction>, List<Transaction>>.fromHandlers(
             handleError: (error, stackTrace, sink) {
-              print('Error in transactions stream: $error');
+              AppLogger.error('FirestoreService', 'Error in transactions stream', error);
               sink.add(<Transaction>[]);
             },
           ),
@@ -212,13 +241,14 @@ class FirestoreService {
     List<Transaction> transactions,
   ) async {
     try {
+      final db = _firestore;
       final userId = _userId;
-      if (userId == null) {
-        throw Exception('User not authenticated');
+      if (db == null || userId == null) {
+        return;
       }
 
-      final batch = _firestore.batch();
-      final userDoc = _firestore
+      final batch = db.batch();
+      final userDoc = db
           .collection('users')
           .doc(userId)
           .collection('transactions');
@@ -237,7 +267,7 @@ class FirestoreService {
 
       await batch.commit();
     } catch (e) {
-      throw Exception('Failed to save bank statement transactions: $e');
+      AppLogger.error('FirestoreService', 'Failed to save bank statement transactions', e);
     }
   }
 }

@@ -119,10 +119,6 @@ class BackgroundSmsService {
 
     try {
       AppLogger.info(_tag, 'Stopping listener...');
-
-      try {
-        AppLogger.info(_tag, 'Stopping listener...');
-
       _isListening = false;
 
       // Save listener state
