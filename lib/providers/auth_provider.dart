@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/user_preferences.dart';
@@ -14,9 +15,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isAuthenticated => user != null;
 
-  /// Initialize auth provider - restores user session if available
   Future<void> init() async {
-    
     loading = true;
     error = null;
     notifyListeners();
@@ -25,22 +24,17 @@ class AuthProvider extends ChangeNotifier {
       user = await authService.currentUser();
 
       if (user != null) {
-        // User is already logged in via Firebase
         await UserPreferences.saveEmail(user!.email);
-        
-    user = await authService.currentUser();
-    
-    // If no active session, try to restore from saved email
-    if (user == null) {
+        return;
+      }
+
       final savedEmail = await UserPreferences.getEmail();
       if (savedEmail != null && savedEmail.isNotEmpty) {
-        // Restore user session from saved email
         user = AppUser(
-  id: savedEmail, // temporary fallback
-  email: savedEmail,
-  createdAt: DateTime.now(),
-);
-        
+          id: savedEmail,
+          email: savedEmail,
+          createdAt: DateTime.now(),
+        );
       }
     } catch (e) {
       error = 'Failed to restore session: $e';
@@ -51,7 +45,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Login with email and password
   Future<bool> login(String email, String password) async {
     loading = true;
     error = null;
@@ -68,6 +61,7 @@ class AuthProvider extends ChangeNotifier {
         await UserPreferences.saveEmail(user!.email);
         return true;
       }
+
       error = 'Login failed';
       return false;
     } catch (e) {
@@ -80,7 +74,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Register new user
   Future<bool> register(String email, String password) async {
     loading = true;
     error = null;
@@ -103,6 +96,7 @@ class AuthProvider extends ChangeNotifier {
         await UserPreferences.saveEmail(user!.email);
         return true;
       }
+
       error = 'Registration failed';
       return false;
     } catch (e) {
@@ -115,7 +109,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Logout current user
   Future<void> logout() async {
     try {
       loading = true;
@@ -131,7 +124,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Clear error message
   void clearError() {
     error = null;
     notifyListeners();

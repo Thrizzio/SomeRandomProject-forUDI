@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'background_sms_service.dart';
 import 'app_logger.dart';
 

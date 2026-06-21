@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:telephony/telephony.dart' hide NetworkType;
 import 'package:workmanager/workmanager.dart';
@@ -86,7 +84,10 @@ class BackgroundSmsService {
     try {
       AppLogger.info(_tag, 'Starting listener...');
 
+
       // Listen to incoming SMS messages in foreground/background using telephony
+
+
       telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) {
           _handleIncomingSms(message);
@@ -115,8 +116,13 @@ class BackgroundSmsService {
       return;
     }
 
+
     try {
       AppLogger.info(_tag, 'Stopping listener...');
+
+      try {
+        AppLogger.info(_tag, 'Stopping listener...');
+
       _isListening = false;
 
       // Save listener state

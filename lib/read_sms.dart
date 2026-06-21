@@ -1,22 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:telephony/telephony.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart';
 
-import 'tax-intelligence/index.dart';
-import 'widgets/transaction_card.dart';
-import 'widgets/tax_health_card.dart';
-import 'widgets/suggestion_card.dart';
-import 'widgets/income_summary_card.dart';
-import 'theme/app_spacing.dart';
-import 'services/database_service.dart';
-import 'services/bank_statement_service.dart';
-import 'services/app_logger.dart';
 import 'models/transaction.dart' as app_models;
 import 'screens/bank_statement/bank_statement_upload_page.dart';
+import 'services/app_logger.dart';
+import 'services/bank_statement_service.dart';
+import 'services/database_service.dart';
+import 'tax-intelligence/index.dart';
+import 'theme/app_spacing.dart';
 import 'widgets/error_and_loading_widgets.dart';
-
-// --- Model ---
+import 'widgets/income_summary_card.dart';
+import 'widgets/suggestion_card.dart';
+import 'widgets/tax_health_card.dart';
+import 'widgets/transaction_card.dart';
 
 class ParsedIncome {
   final double amount;
@@ -30,33 +26,32 @@ class ParsedIncome {
   });
 }
 
-// --- Parser ---
-
 class SmsParser {
   static bool isIncomeMessage(String body) {
     final text = body.toLowerCase();
-    if (text.contains("debited") ||
-        text.contains("dr.") ||
-        text.contains("spent") ||
-        text.contains("withdrawn")) {
+    if (text.contains('debited') ||
+        text.contains('dr.') ||
+        text.contains('spent') ||
+        text.contains('withdrawn')) {
       return false;
     }
-    return text.contains("credited") ||
-        text.contains("received") ||
-        text.contains("deposited") ||
-        text.contains("cr.");
+
+    return text.contains('credited') ||
+        text.contains('received') ||
+        text.contains('deposited') ||
+        text.contains('cr.');
   }
 
   static bool isGigIncome(String body) {
     final text = body.toLowerCase();
-    return text.contains("swiggy") ||
-        text.contains("zomato") ||
-        text.contains("uber") ||
-        text.contains("ola") ||
-        text.contains("zepto") ||
-        text.contains("earnings") ||
-        text.contains("payout") ||
-        text.contains("settlement");
+    return text.contains('swiggy') ||
+        text.contains('zomato') ||
+        text.contains('uber') ||
+        text.contains('ola') ||
+        text.contains('zepto') ||
+        text.contains('earnings') ||
+        text.contains('payout') ||
+        text.contains('settlement');
   }
 
   static bool isValidGigIncome(String body) {
@@ -65,32 +60,29 @@ class SmsParser {
 
   static double? extractAmount(String text) {
     final patterns = [
-      RegExp(r'₹\s?([\d,]+(?:\.\d{1,2})?)'),
       RegExp(r'inr\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
       RegExp(r'rs\.?\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'([\d,]+(?:\.\d{1,2})?)'),
     ];
 
     for (final regex in patterns) {
       final match = regex.firstMatch(text);
       if (match != null) {
-        final raw = match.group(1)!.replaceAll(",", "");
+        final raw = match.group(1)!.replaceAll(',', '');
         return double.tryParse(raw);
       }
     }
+
     return null;
   }
 
   static String extractSource(String text) {
     final lower = text.toLowerCase();
-    
-    // Direct matches (high confidence)
-    if (lower.contains("swiggy")) return "Swiggy";
-    if (lower.contains("zomato")) return "Zomato";
-    if (lower.contains("uber")) return "Uber";
-    if (lower.contains("ola")) return "Ola";
-    if (lower.contains("zepto")) return "Zepto";
-    
-    // Fuzzy matching as fallback
+    if (lower.contains('swiggy')) return 'Swiggy';
+    if (lower.contains('zomato')) return 'Zomato';
+    if (lower.contains('uber')) return 'Uber';
+    if (lower.contains('ola')) return 'Ola';
+    if (lower.contains('zepto')) return 'Zepto';
     return fuzzyMatchSource(text);
   }
 
@@ -102,27 +94,19 @@ class SmsParser {
 
   static ParsedIncome? parse(SmsMessage message) {
     try {
-      final body = message.body ?? "";
-      if (body.isEmpty) return null;
-      
-      // Check if valid income message
-      if (!isValidGigIncome(body)) return null;
+      final body = message.body ?? '';
+      if (body.isEmpty || !isValidGigIncome(body)) return null;
 
-      // Extract amount with validation
       final amount = extractAmount(body);
       if (amount == null || amount <= 0) return null;
 
-      // Extract date with fallback
-      final date = extractDate(message) ?? DateTime.now();
-
-      // Extract source with fuzzy matching
       final source = extractSource(body);
       if (source.isEmpty) return null;
 
       return ParsedIncome(
-        amount: amount.abs(), // Ensure positive
+        amount: amount.abs(),
         source: source,
-        date: date,
+        date: extractDate(message) ?? DateTime.now(),
       );
     } catch (e, stackTrace) {
       AppLogger.error('SmsParser', 'SMS parse error', e, stackTrace);
@@ -130,14 +114,12 @@ class SmsParser {
     }
   }
 
-  /// Check for duplicate transactions (prevent duplicates)
   static bool isDuplicate(
     ParsedIncome current,
     List<ParsedIncome> existing, {
     Duration tolerance = const Duration(minutes: 5),
   }) {
     for (final prev in existing) {
-      // Same amount, source, and within 5 minutes = duplicate
       final timeDiff = current.date.difference(prev.date).abs();
       if (current.amount == prev.amount &&
           current.source == prev.source &&
@@ -148,15 +130,14 @@ class SmsParser {
     return false;
   }
 
-  /// Fuzzy match source (handle typos, variations)
   static String fuzzyMatchSource(String text) {
     final lower = text.toLowerCase();
     final sources = {
-      'swiggy': ['swiggy', 'swigy', 'swiggi', 'swiggie'],
-      'zomato': ['zomato', 'zomto', 'zomata', 'jomato'],
-      'uber': ['uber', 'uber eats', 'ubereats', 'uber eat'],
-      'ola': ['ola', 'ola cabs', 'olacabs'],
-      'zepto': ['zepto', 'zept', 'zepto.in'],
+      'Swiggy': ['swiggy', 'swigy', 'swiggi', 'swiggie'],
+      'Zomato': ['zomato', 'zomto', 'zomata', 'jomato'],
+      'Uber': ['uber', 'uber eats', 'ubereats', 'uber eat'],
+      'Ola': ['ola', 'ola cabs', 'olacabs'],
+      'Zepto': ['zepto', 'zept', 'zepto.in'],
     };
 
     for (final entry in sources.entries) {
@@ -166,31 +147,34 @@ class SmsParser {
         }
       }
     }
+
     return 'Unknown';
-  }
-
-  /// Validate transaction quality (return confidence score)
-  static double getConfidenceScore(ParsedIncome income) {
-    double score = 0.0;
-
-    // Amount validation
-    if (income.amount > 50 && income.amount < 50000) score += 0.3;
-
-    // Source confidence
-    if (income.source != 'Unknown') score += 0.4;
-
-    // Date confidence (not too old)
-    final ageDays = DateTime.now().difference(income.date).inDays;
-    if (ageDays < 30) score += 0.3;
-
-    return score;
   }
 }
 
-// --- Add Income Dialog ---
+@pragma('vm:entry-point')
+Future<void> smsBackgroundHandler(SmsMessage message) async {
+  try {
+    final parsed = SmsParser.parse(message);
+    if (parsed == null) return;
+
+    await DatabaseService.insertTransaction(
+      app_models.Transaction(
+        amount: parsed.amount.toString(),
+        sender: parsed.source,
+        messageBody: message.body ?? 'Parsed SMS income',
+        transactionType: 'income',
+        date: parsed.date.toIso8601String(),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Background SMS handler failed: $e');
+  }
+}
 
 class AddIncomeDialog extends StatefulWidget {
-  final Function(double amount, String source) onSave;
+  final void Function(double amount, String source) onSave;
+
   const AddIncomeDialog({required this.onSave, super.key});
 
   @override
@@ -212,17 +196,11 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
   void _submit() {
     setState(() => _errorMessage = null);
 
-    final amountText = _amountController.text.trim();
+    final amount = double.tryParse(_amountController.text.trim());
     final source = _sourceController.text.trim();
 
-    if (amountText.isEmpty) {
-      setState(() => _errorMessage = 'Amount is required');
-      return;
-    }
-
-    final amount = double.tryParse(amountText);
     if (amount == null || amount <= 0) {
-      setState(() => _errorMessage = 'Enter a valid amount > 0');
+      setState(() => _errorMessage = 'Enter a valid amount greater than 0');
       return;
     }
 
@@ -237,76 +215,49 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Add Income',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return AlertDialog(
+      title: const Text('Add Income'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Amount',
+              hintText: 'e.g. 5000',
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                hintText: 'e.g., 5000',
-                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
-              ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _sourceController,
+            decoration: const InputDecoration(
+              labelText: 'Source',
+              hintText: 'e.g. Freelance, Client',
             ),
+          ),
+          if (_errorMessage != null) ...[
             const SizedBox(height: 12),
-            TextField(
-              controller: _sourceController,
-              decoration: InputDecoration(
-                labelText: 'Source',
-                hintText: 'e.g., Freelance, Client',
-                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
-              ),
-            ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                color: Colors.red.shade50,
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade700,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                  ),
-                  child: const Text('Add'),
-                ),
-              ],
+            Text(
+              _errorMessage!,
+              style: TextStyle(color: Colors.red.shade700),
             ),
           ],
-        ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }
-
-// --- Screen ---
 
 class ReadSmsScreen extends StatefulWidget {
   const ReadSmsScreen({
@@ -320,34 +271,10 @@ class ReadSmsScreen extends StatefulWidget {
   State<ReadSmsScreen> createState() => _ReadSmsScreenState();
 }
 
-
-class _ReadSmsScreenState extends State<ReadSmsScreen> {
+class _ReadSmsScreenState extends State<ReadSmsScreen>
+    with WidgetsBindingObserver {
   static const String _tag = 'ReadSmsScreen';
 
-=======
-@pragma('vm:entry-point')
-Future<void> smsBackgroundHandler(SmsMessage message) async {
-  try {
-    final parsed = SmsParser.parse(message);
-    if (parsed == null) return;
-
-    await DatabaseService.insertTransaction(
-      app_models.Transaction(
-        amount: parsed.amount.toString(),
-        sender: parsed.source,
-        messageBody: message.body ?? 'Parsed SMS income',
-        transactionType: 'income',
-        date: parsed.date,
-      ),
-    );
-  } catch (e) {
-    debugPrint('Background SMS handler failed: $e');
-  }
-}
-
-class _ReadSmsScreenState extends State<ReadSmsScreen>
-    with WidgetsBindingObserver 
-  
   final Telephony telephony = Telephony.instance;
   final List<ParsedIncome> _incomes = [];
   TaxIntelligenceResult? _taxResult;
@@ -357,22 +284,39 @@ class _ReadSmsScreenState extends State<ReadSmsScreen>
   double get _totalIncome =>
       _incomes.fold(0.0, (sum, item) => sum + item.amount);
 
-
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AppLogger.info(_tag, 'Screen initialized');
     _initializeScreen();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadSavedTransactions();
+    }
+  }
+
   Future<void> _initializeScreen() async {
     try {
-      setState(() => _isLoading = true);
-      
+      setState(() {
+        _isLoading = true;
+        _loadingError = null;
+      });
+
       await _initializeBankStatementDatabase();
       await _loadSavedTransactions();
-      startListening();
-      
+      await startListening();
+
+      if (!mounted) return;
       setState(() => _isLoading = false);
     } catch (e, stackTrace) {
       AppLogger.error(_tag, 'Initialization failed', e, stackTrace);
@@ -383,92 +327,57 @@ class _ReadSmsScreenState extends State<ReadSmsScreen>
         });
       }
     }
-
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addObserver(this);
-  _initializeBankStatementDatabase();
-  _loadSavedTransactions();
-  startListening();
-}
-
-@override
-void dispose() {
-  WidgetsBinding.instance.removeObserver(this);
-  super.dispose();
-}
-
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  if (state == AppLifecycleState.resumed) {
-    _loadSavedTransactions();
-
   }
-}
 
   Future<void> _initializeBankStatementDatabase() async {
-    try {
-      AppLogger.info(_tag, 'Initializing bank statement database');
-      await BankStatementService.initBankStatementTable();
-    } catch (e) {
-      AppLogger.error(_tag, 'Failed to initialize bank statement table', e);
-      rethrow;
-    }
+    AppLogger.info(_tag, 'Initializing bank statement database');
+    await BankStatementService.initBankStatementTable();
   }
 
   Future<void> _loadSavedTransactions() async {
     try {
       AppLogger.info(_tag, 'Loading saved transactions');
-      
-      // Load SMS transactions
+
       final smsTransactions =
           await DatabaseService.getTransactionsByType('income');
 
-      final smsIncomes = smsTransactions.map((t) {
+      final smsIncomes = smsTransactions.map((transaction) {
         return ParsedIncome(
-          amount: _parseAmountString(t.amount),
-          source: t.sender,
-          date: t.date,
+          amount: _parseAmountString(transaction.amount),
+          source: transaction.sender,
+          date: transaction.getDateTime(),
         );
       }).toList();
 
-      // Load bank statement transactions - ALL organizations
       final bankStatementTransactions =
           await BankStatementService.getAllTransactions();
 
-      final bankIncomes = bankStatementTransactions.map((t) {
+      final bankIncomes = bankStatementTransactions.map((transaction) {
         return ParsedIncome(
-          amount: t.amount,
-          source: t.organization,
-          date: t.transactionDate,
+          amount: transaction.amount,
+          source: transaction.organization,
+          date: transaction.transactionDate,
         );
       }).toList();
 
-      // Combine all transactions with duplicate filtering
-      final allIncomes = [...smsIncomes, ...bankIncomes];
-      
-      // Filter duplicates using enhanced parser
       final uniqueIncomes = <ParsedIncome>[];
-      for (final income in allIncomes) {
+      for (final income in [...smsIncomes, ...bankIncomes]) {
         if (!SmsParser.isDuplicate(income, uniqueIncomes)) {
           uniqueIncomes.add(income);
         }
       }
-      
+
       uniqueIncomes.sort((a, b) => b.date.compareTo(a.date));
 
       if (!mounted) return;
-
       setState(() {
         _incomes
           ..clear()
           ..addAll(uniqueIncomes);
-
         _taxResult =
             _incomes.isEmpty ? null : TaxIntelligence.analyze(_totalIncome);
       });
-      
+
       AppLogger.info(_tag, 'Loaded ${_incomes.length} transactions');
     } catch (e, stackTrace) {
       AppLogger.error(_tag, 'Failed to load saved transactions', e, stackTrace);
@@ -477,53 +386,38 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   }
 
   double _parseAmountString(String value) {
-    try {
-      return double.tryParse(
-            value.replaceAll(',', '').replaceAll('₹', '').trim(),
-          ) ??
-          0.0;
-    } catch (e) {
-      AppLogger.warning(_tag, 'Failed to parse amount: $value');
-      return 0.0;
-    }
+    return double.tryParse(
+          value.replaceAll(',', '').replaceAll('INR', '').trim(),
+        ) ??
+        0.0;
   }
 
   Future<void> _saveIncomeToDatabase(
     ParsedIncome income, {
     String messageBody = 'Parsed SMS income',
   }) async {
-    try {
-      AppLogger.info(_tag, 'Saving income to database: ${income.source} - ${income.amount}');
-      
-      await DatabaseService.insertTransaction(
-        app_models.Transaction(
-          amount: income.amount.toString(),
-          sender: income.source,
-          messageBody: messageBody,
-          transactionType: 'income',
-          date: income.date,
-        ),
-      );
-      
-      AppLogger.info(_tag, 'Income saved successfully');
-    } catch (e, stackTrace) {
-      AppLogger.error(_tag, 'Failed to save transaction', e, stackTrace);
-    }
+    await DatabaseService.insertTransaction(
+      app_models.Transaction(
+        amount: income.amount.toString(),
+        sender: income.source,
+        messageBody: messageBody,
+        transactionType: 'income',
+        date: income.date.toIso8601String(),
+      ),
+    );
   }
-
 
   Future<void> _onNewIncome(
     ParsedIncome income, {
     String messageBody = 'Parsed SMS income',
   }) async {
     try {
-      setState(() {
-        // Use enhanced duplicate detection
-        if (!SmsParser.isDuplicate(income, _incomes)) {
-          _incomes.insert(0, income);
-          _incomes.sort((a, b) => b.date.compareTo(a.date));
-        }
+      final isNew = !SmsParser.isDuplicate(income, _incomes);
+      if (!isNew) return;
 
+      setState(() {
+        _incomes.insert(0, income);
+        _incomes.sort((a, b) => b.date.compareTo(a.date));
         _taxResult = TaxIntelligence.analyze(_totalIncome);
       });
 
@@ -533,25 +427,28 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     }
   }
 
-  void startListening() {
+  Future<void> startListening() async {
     try {
-      AppLogger.info(_tag, 'Starting SMS listener');
+      final permissionsGranted =
+          await telephony.requestPhoneAndSmsPermissions ?? false;
+
+      if (!permissionsGranted) {
+        AppLogger.warning(_tag, 'SMS permissions not granted');
+        return;
+      }
+
       telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) async {
-          try {
-            final parsed = SmsParser.parse(message);
-            if (parsed != null) {
-              AppLogger.info(_tag, 'Parsed income: ${parsed.source} - ${parsed.amount}');
-              await _onNewIncome(
-                parsed,
-                messageBody: message.body ?? 'Parsed SMS income',
-              );
-            }
-          } catch (e, stackTrace) {
-            AppLogger.error(_tag, 'Error in SMS listener', e, stackTrace);
+          final parsed = SmsParser.parse(message);
+          if (parsed != null) {
+            await _onNewIncome(
+              parsed,
+              messageBody: message.body ?? 'Parsed SMS income',
+            );
           }
         },
-        listenInBackground: false,
+        onBackgroundMessage: smsBackgroundHandler,
+        listenInBackground: true,
       );
     } catch (e, stackTrace) {
       AppLogger.error(_tag, 'Failed to start SMS listener', e, stackTrace);
@@ -559,81 +456,57 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   }
 
   Future<void> _addManualIncome(double amount, String source) async {
-    try {
-      AppLogger.info(_tag, 'Adding manual income: $source - $amount');
-      
-      final income = ParsedIncome(
-        amount: amount,
-        source: source,
-        date: DateTime.now(),
-      );
-      
-      await _onNewIncome(income, messageBody: 'Manual income entry');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Income added successfully'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      
-      AppLogger.info(_tag, 'Manual income added successfully');
-    } catch (e, stackTrace) {
-      AppLogger.error(_tag, 'Error adding manual income', e, stackTrace);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red.shade600,
-          ),
-        );
-      }
-    }
+    final income = ParsedIncome(
+      amount: amount,
+      source: source,
+      date: DateTime.now(),
+    );
+
+    await _onNewIncome(income, messageBody: 'Manual income entry');
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Income added successfully'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _showBankStatementUploadDialog() {
-    AppLogger.info(_tag, 'Opening bank statement upload');
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const BankStatementUploadPage(),
       ),
-    );
+    ).then((_) => _loadSavedTransactions());
   }
 
   void _showAddIncomeDialog() {
-    AppLogger.info(_tag, 'Opening add income dialog');
     showDialog(
       context: context,
-      builder: (context) => AddIncomeDialog(
-        onSave: _addManualIncome,
-      ),
+      builder: (context) => AddIncomeDialog(onSave: _addManualIncome),
     );
   }
 
   Future<void> _retryLoad() async {
-    AppLogger.info(_tag, 'Retrying load');
     await _initializeScreen();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Show loading state
     if (_isLoading) {
       return Scaffold(
         appBar: ProductionAppBar(
           title: 'GigTax',
           actions: widget.appBarActions,
         ),
-        body: LoadingIndicator(
+        body: const LoadingIndicator(
           message: 'Loading your transactions...',
         ),
       );
     }
 
-    // Show error state
     if (_loadingError != null) {
       return Scaffold(
         appBar: ProductionAppBar(
@@ -695,9 +568,10 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
                           alignment: Alignment.centerLeft,
                           child: Text(
                             'Recent Transactions (${_incomes.length} total)',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
@@ -718,162 +592,21 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
                             padding: const EdgeInsets.only(top: AppSpacing.lg),
                             child: Text(
                               'And ${_incomes.length - 10} more transactions',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey.shade600,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.grey.shade600),
                             ),
                           ),
                       ],
                     ),
-
- Future<void> _onNewIncome(
-  ParsedIncome income, {
-  String messageBody = 'Parsed SMS income',
-}) async {
-  final alreadyExists = _incomes.any(
-    (item) =>
-        item.amount == income.amount &&
-        item.source == income.source &&
-        item.date.millisecondsSinceEpoch ==
-            income.date.millisecondsSinceEpoch,
-  );
-
-  if (alreadyExists) return;
-
-  setState(() {
-    _incomes.insert(0, income);
-    _incomes.sort((a, b) => b.date.compareTo(a.date));
-    _taxResult = TaxIntelligence.analyze(_totalIncome);
-  });
-
-  await _saveIncomeToDatabase(income, messageBody: messageBody);
-}
-
-  Future<void> startListening() async {
-  final bool? permissionsGranted =
-      await telephony.requestPhoneAndSmsPermissions;
-
-  if (permissionsGranted != true) {
-    debugPrint('SMS permissions not granted');
-    return;
-  }
-
-  telephony.listenIncomingSms(
-    onNewMessage: (SmsMessage message) async {
-      final parsed = SmsParser.parse(message);
-      if (parsed != null) {
-        await _onNewIncome(
-          parsed,
-          messageBody: message.body ?? 'Parsed SMS income',
-        );
-      }
-    },
-    onBackgroundMessage: smsBackgroundHandler,
-    listenInBackground: true,
-  );
-}
-
-void _showBankStatementUploadDialog() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const BankStatementUploadPage(),
-    ),
-  );
-}
-
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text("Gig Income Tracker"),
-      actions: widget.appBarActions,
-    ),
-    floatingActionButton: FloatingActionButton(
-      onPressed: _showBankStatementUploadDialog,
-      tooltip: 'Upload Bank Statement',
-      child: const Icon(Icons.add),
-    ),
-    body: _incomes.isEmpty
-        ? _buildEmptyState()
-        : SingleChildScrollView(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    children: [
-                      IncomeSummaryCard(
-                        count: _incomes.length,
-                        total: _totalIncome,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Recent Transactions',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Rendered items: ${_incomes.length}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      ..._incomes.map((income) {
-                        return Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: AppSpacing.md,
-                          ),
-                          child: TransactionCard(
-                            source: income.source,
-                            amount: income.amount,
-                            date: income.date,
-                          ),
-                        );
-                      }).toList(),
-                    ],
-
                   ),
-                ),
-                if (_taxResult != null) _buildTaxSection(_taxResult!),
-              ],
+                  if (_taxResult != null) _buildTaxSection(_taxResult!),
+                ],
+              ),
             ),
-          ),
-  );
-}
-//                         ),
-//                       ),
-//                       const SizedBox(height: AppSpacing.md),
-
-//                       Text(
-//                         'Rendered items: ${_incomes.length}',
-//                         style: Theme.of(context).textTheme.bodySmall,
-//                       ),
-//                       const SizedBox(height: AppSpacing.sm),
-
-//                       ..._incomes.map((income) {
-//                         return Padding(
-//                           padding: const EdgeInsets.only(
-//                             bottom: AppSpacing.md,
-//                           ),
-//                           child: TransactionCard(
-//                             source: income.source,
-//                             amount: income.amount,
-//                             date: income.date,
-//                           ),
-//                         );
-//                       }).toList(),
-//                     ],
-//                   ),
-//                 ),
-//                 if (_taxResult != null) _buildTaxSection(_taxResult!),
-//               ],
-//             ),
-//           ),
-//   );
-// }
+    );
+  }
 
   Widget _buildEmptyState() {
     return EmptyStateWidget(
@@ -890,7 +623,7 @@ Widget build(BuildContext context) {
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           ),
         ),
       ),
@@ -903,10 +636,10 @@ Widget build(BuildContext context) {
             taxableIncome: result.taxableIncome,
             taxPayable: result.taxPayable,
           ),
-          if (result.suggestions.isNotEmpty)
+          if (result.suggestions.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
-          if (result.suggestions.isNotEmpty)
             _buildSuggestionsSection(result),
+          ],
         ],
       ),
     );
@@ -918,9 +651,10 @@ Widget build(BuildContext context) {
       children: [
         Text(
           'Tips & Recommendations',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.md),
         ...result.suggestions.map((suggestion) {

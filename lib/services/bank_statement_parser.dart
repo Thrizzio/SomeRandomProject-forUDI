@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import '../models/bank_statement_transaction.dart';
@@ -79,7 +78,7 @@ class BankStatementParser {
           if (transaction != null) {
             transactions.add(transaction);
           }
-        } catch (e, stackTrace) {
+        } catch (e) {
           AppLogger.warning(_tag, 'Error parsing row $i: $e');
           continue;
         }
@@ -141,7 +140,7 @@ class BankStatementParser {
         transactionType: 'income',
         bankStatementFileName: fileName,
       );
-    } catch (e, stackTrace) {
+    } catch (e) {
       AppLogger.warning(_tag, 'Error parsing row $rowIndex: $e');
       return null;
     }
