@@ -1,414 +1,570 @@
-# 📱 GigTax – SMS-Based Income Tracker for Gig Workers
+# GigTax !
 
-GigTax is a production-ready mobile application that automatically extracts income data from SMS messages and provides a structured financial overview for gig workers, along with real-time tax estimation under presumptive taxation (ITR-4).
-
-**Status:** ✅ **Production Ready** (v2.0.0)
+> SMS-powered income tracker and tax estimator for gig workers — turns your phone's SMS inbox into a structured, tax-ready income ledger using on-device parsing, with zero manual entry and zero data leaving the device.
 
 ---
 
-## 🚀 What's New (v2.0.0 - Production Upgrade)
-
-### ✨ Major Improvements
-
-| Feature | Before | After |
-|---------|--------|-------|
-| **Authentication** | Local in-memory | Firebase Auth (persistent, secure) |
-| **Database** | SQLite (local only) | Firestore (cloud + real-time sync) |
-| **Error Handling** | Silent failures | Comprehensive try-catch blocks |
-| **Logging** | Random debugPrints | Centralized AppLogger |
-| **UI States** | Scattered loading flags | Unified UiStateProvider |
-| **Error Display** | None | Professional error/empty state widgets |
-| **Session Persistence** | Lost on restart | Automatic Firebase persistence |
-| **Data Sync** | Manual | Real-time Firestore sync |
-| **User Isolation** | Weak | Firebase security rules enforce isolation |
-
-### 🔒 Security Enhancements
-- ✅ Firebase Authentication with email/password
-- ✅ User-specific data isolation via Firestore
-- ✅ Secure session management
-- ✅ Firestore security rules
-- ✅ Encrypted data transmission
-
-### 🎯 New Architecture
-- ✅ Clean separation of concerns
-- ✅ Provider-based state management
-- ✅ Production-ready error handling
-- ✅ Comprehensive logging framework
-- ✅ Reusable UI components
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+[![Dart](https://img.shields.io/badge/Dart-Language-0175C2?logo=dart&logoColor=white)](https://dart.dev/)
+[![Android](https://img.shields.io/badge/Android-SMS%20APIs-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-Local%20Database-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Status](https://img.shields.io/badge/Status-MVP%20Ready-success.svg)]()
+[![Tax Regime](https://img.shields.io/badge/Tax%20Regime-ITR--4%20Presumptive-orange.svg)]()
+[![Privacy](https://img.shields.io/badge/Data%20Egress-Zero-success.svg)]()
 
 ---
 
-## 🌟 Features (MVP)
+## Table of Contents
 
-- 📩 **Automatic SMS Parsing**
-  - Reads incoming SMS messages
-  - Detects financial transactions (credited, payout, received)
-
-- 💰 **Income Extraction**
-  - Extracts ₹ amounts using regex
-  - Identifies potential income sources
-
-- 📊 **Live Income Dashboard**
-  - Displays parsed transactions in real-time
-  - Shows total earnings
-  - Real-time Firestore sync
-
-- 🧾 **Tax Estimation (ITR-4)**
-  - Supports presumptive taxation:
-    - Business: 6% / 8%
-    - Professional: 50%
-
-- 🏦 **Bank Statement Import**
-  - Upload CSV bank statements
-  - Automatic transaction parsing
-  - Bulk import to cloud
-
----
-
-## 🏗️ Architecture
-
-### Technology Stack
-
-```
-Frontend:     Flutter 3.11.4
-State Mgmt:   Provider 6.1.2
-Backend:      Firebase
-Authentication: Firebase Auth
-Database:     Cloud Firestore
-Local Storage: SQLite (deprecated) → Firestore
-SMS Access:   Telephony plugin
-Logging:      AppLogger (custom)
-```
-
-### Project Structure
-
-```
-lib/
-├── main.dart                          # App entry point with Firebase init
-├── firebase_options.dart              # Firebase configuration (auto-generated)
-├── models/
-│   ├── transaction.dart               # Firestore-compatible transaction model
-│   ├── user.dart                      # User model
-│   └── bank_statement_transaction.dart
-├── services/
-│   ├── firebase_auth_service.dart     # Firebase authentication ⭐ NEW
-│   ├── firestore_service.dart         # Cloud database operations ⭐ NEW
-│   ├── app_logger.dart                # Production logging ⭐ NEW
-│   ├── auth_service.dart              # Auth interface
-│   ├── background_sms_service.dart    # Background SMS listening
-│   ├── foreground_sms_handler.dart    # SMS handler management
-│   ├── bank_statement_parser.dart     # CSV parsing with error handling
-│   ├── database_service.dart          # SQLite (legacy)
-│   ├── user_preferences.dart          # Local storage
-│   └── local_auth_service.dart        # Local auth (deprecated)
-├── providers/
-│   ├── auth_provider.dart             # Auth state management (upgraded)
-│   └── ui_state_provider.dart         # UI state management ⭐ NEW
-├── screens/
-│   ├── auth/                          # Login/Register screens
-│   ├── home/                          # Dashboard
-│   └── bank_statement/                # Bank statement upload
-├── widgets/
-│   ├── auth_gate.dart                 # Auth routing
-│   ├── error_and_loading_widgets.dart # Reusable UI components ⭐ NEW
-│   └── [other UI widgets]
-├── tax-intelligence/                  # Tax calculation engine
-└── theme/                             # App theming
-
-docs/
-├── PRODUCTION_UPGRADE_GUIDE.md        # Complete upgrade documentation ⭐ NEW
-├── IMPLEMENTATION_GUIDE.md            # How to use new services ⭐ NEW
-├── FIREBASE_SETUP_GUIDE.md            # Firebase setup instructions ⭐ NEW
-└── VERIFICATION_REPORT.md
-```
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Why On-Device Parsing](#why-on-device-parsing)
+- [System Architecture](#system-architecture)
+- [Parsing Pipeline](#parsing-pipeline)
+- [Background SMS Capture Flow](#background-sms-capture-flow)
+- [Data Model](#data-model)
+- [Features](#features)
+- [Tax Estimation — ITR-4](#tax-estimation--itr-4)
+- [Tax Decision Logic](#tax-decision-logic)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Testing SMS Parsing on an Emulator](#testing-sms-parsing-on-an-emulator)
+- [Permissions](#permissions)
+- [Security and Privacy Model](#security-and-privacy-model)
+- [Demo Flow](#demo-flow)
+- [Known Limitations](#known-limitations)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🚀 Getting Started
+## The Problem
 
-### Prerequisites
-- Flutter SDK >= 3.11.4
-- Dart >= 3.0
-- Firebase project (free tier available)
-- Android SDK 21+ / iOS 12.0+
+India has approximately 15 million gig workers across platforms like Swiggy, Uber, Zomato, Urban Company, and Upwork. They face a financial problem that no existing product solves:
 
-### 1. Clone & Setup
+| Pain Point | Reality |
+|---|---|
+| Fragmented income | Earnings split across 3 to 7 platforms with no unified view |
+| No paper trail | Income is buried in SMS inboxes, not structured ledgers |
+| Tax confusion | Most gig workers don't know they qualify for ITR-4 presumptive taxation |
+| Signal vs. noise | Income SMSes are mixed in with OTPs, promotional offers, and personal bank credits |
+| Compliance risk | Under-reporting or non-filing due to lack of visibility into actual annual earnings |
+| Accountant cost | Professional tax help often costs more than the tax actually owed under presumptive schemes |
+
+GigTax addresses this directly from the SMS inbox, automatically, with no manual data entry and no recurring cost.
+
+---
+
+## The Solution
+
+GigTax reads SMS messages locally on-device, filters income-related transactions, and converts raw text into a structured financial dashboard with live ITR-4 tax estimation.
+
+```
+SMS Inbox  ->  Keyword and Pattern Filter  ->  Structured Income Ledger  ->  Tax Estimate
+```
+
+No manual entry. No bank account integration required. No data ever leaves the device.
+
+---
+
+## Why On-Device Parsing
+
+Most fintech apps solve the "fragmented income" problem by asking users to connect their bank account through an aggregator (Account Aggregator framework, screen-scraping, or OAuth-based bank linking). GigTax deliberately avoids this for three reasons:
+
+1. **Trust friction** — gig workers are often wary of linking bank credentials to a third-party app, especially an early-stage one with no institutional backing
+2. **Coverage gaps** — many gig payouts settle into UPI handles or wallets before reaching a bank account, and aggregator APIs do not always capture every leg of that journey
+3. **Latency** — SMS notifications arrive the instant a payout settles; bank statement APIs often lag by hours or days, and many are pull-based rather than push-based
+
+SMS is the one channel every Indian gig worker already has, already trusts, and that updates in real time without any integration cost.
+
+---
+
+## System Architecture
+
+The high-level component view of GigTax — everything runs on-device, with no backend service in the data path.
+
+```mermaid
+graph TB
+    subgraph OS [Android OS Layer]
+        SMSPROV[SMS Content Provider]
+        SMSBROADCAST[SMS_RECEIVED Broadcast]
+    end
+
+    subgraph App [GigTax Flutter Application]
+        subgraph UI [Presentation Layer]
+            PERMSCREEN[Permission Screen]
+            DASH[Dashboard Screen]
+            TAXSCREEN[Tax Estimation Screen]
+        end
+
+        subgraph State [State Management - Provider]
+            INCPROV[Income Provider]
+            TAXPROV[Tax Provider]
+        end
+
+        subgraph Services [Service Layer]
+            READER[SMS Reader - Initial Backfill]
+            LISTENER[SMS Listener - Background Receiver]
+            PARSER[SMS Parser - Regex Engine]
+            DEDUP[Dedup Service]
+            CALC[Tax Calculator - 44AD / 44ADA]
+        end
+
+        subgraph Data [Local Data Layer]
+            SQLITE[(SQLite via sqflite)]
+        end
+    end
+
+    SMSPROV -->|Query on first launch| READER
+    SMSBROADCAST -->|Real-time trigger| LISTENER
+
+    READER --> PARSER
+    LISTENER --> PARSER
+    PARSER --> DEDUP
+    DEDUP --> SQLITE
+
+    SQLITE --> INCPROV
+    INCPROV --> DASH
+
+    INCPROV --> CALC
+    CALC --> TAXPROV
+    TAXPROV --> TAXSCREEN
+
+    PERMSCREEN -.->|Grants access| SMSPROV
+```
+
+---
+
+## Parsing Pipeline
+
+How a single raw SMS becomes a validated, deduplicated transaction record. Four progressively narrower stages run on every candidate message.
+
+```mermaid
+flowchart TD
+    SMS([Incoming SMS]) --> S1{Stage 1\nSender Allowlist Match}
+
+    S1 -->|Known sender e.g. SWIGGY, UBERIND| S2A[Apply platform-specific\nparsing rules]
+    S1 -->|Unrecognised sender| S2B[Fall back to generic\nkeyword scan]
+
+    S2A --> S3{Stage 2\nKeyword Scoring}
+    S2B --> S3
+
+    S3 -->|Score below threshold| DISCARD([Discard Message])
+    S3 -->|Score above threshold| S4[Stage 3\nMulti-pattern Amount Extraction]
+
+    S4 --> P1{Rs.340.00 format?}
+    P1 -->|Match| EXTRACTED[Amount Extracted]
+    P1 -->|No match| P2{INR 1,250 format?}
+    P2 -->|Match| EXTRACTED
+    P2 -->|No match| P3{₹520/- format?}
+    P3 -->|Match| EXTRACTED
+    P3 -->|No match| P4{Rs 99 format?}
+    P4 -->|Match| EXTRACTED
+    P4 -->|No match| DISCARD
+
+    EXTRACTED --> S5[Stage 4\nReference ID Capture]
+
+    S5 --> S6{Reference ID present?}
+    S6 -->|Yes| KEY1[Dedup key = Reference ID]
+    S6 -->|No| KEY2[Dedup key = Sender + Amount\n+ Rounded timestamp window]
+
+    KEY1 --> CHECK{Key already in SQLite?}
+    KEY2 --> CHECK
+
+    CHECK -->|Yes| SKIP([Skip — Already Recorded])
+    CHECK -->|No| STORE([Store as New Transaction])
+```
+
+---
+
+## Background SMS Capture Flow
+
+What happens after the initial inbox scan, when the app is idle or backgrounded and a new income SMS arrives.
+
+```mermaid
+sequenceDiagram
+    actor Platform as Swiggy / Uber / Bank
+    participant Android as Android SMS System
+    participant Receiver as SMS Broadcast Receiver
+    participant Parser as Parsing Pipeline
+    participant DB as SQLite
+    participant Provider as Income Provider
+    participant UI as Dashboard UI
+
+    Platform->>Android: Delivers SMS to device
+    Android->>Receiver: Broadcasts SMS_RECEIVED intent
+    Receiver->>Receiver: Extract sender and body from intent
+
+    Receiver->>Parser: Pass message for processing
+    Parser->>Parser: Run keyword scoring and regex extraction
+
+    alt Message matches income pattern
+        Parser->>DB: Check deduplication key
+        DB-->>Parser: Not a duplicate
+        Parser->>DB: INSERT new transaction record
+        DB-->>Provider: Notify listeners of data change
+        Provider->>UI: Trigger rebuild with new transaction
+        UI-->>Platform: User sees updated dashboard instantly
+    else Message does not match
+        Parser->>Parser: Discard - never written to database
+    end
+```
+
+---
+
+## Data Model
+
+```
+Transaction
+├── id                  TEXT PRIMARY KEY
+├── senderId            TEXT        e.g. "SWIGGY", "UBERIND"
+├── amount               REAL        parsed rupee value
+├── rawMessage           TEXT        original SMS body, stored for audit
+├── timestamp            INTEGER     epoch millis of SMS receipt
+├── referenceId          TEXT NULL   bank/platform reference if present
+├── category             TEXT        "business" | "professional" | "uncategorised"
+├── source               TEXT        "platform" | "bank" | "unknown"
+└── isDuplicateOf        TEXT NULL   self-referential FK if flagged as duplicate
+```
+
+All fields are stored exclusively in the local SQLite database. There is no remote schema, no sync table, and no server-side mirror in the current MVP.
+
+---
+
+## Features
+
+### Intelligent SMS Parsing
+
+- Reads the device SMS inbox via Android's native SMS API
+- Filters messages using income-specific keyword detection (`credited`, `payout`, `received`, `earnings`, `transferred`)
+- Handles multi-format sender IDs (for example `SWIGGY`, `UBERIND`, `AD-ICICIB`)
+- Falls back to generic scanning for unrecognised senders, so new platforms are captured without an app update
+
+### Income Extraction Engine
+
+- Extracts rupee amounts using a multi-pattern regex cascade covering common Indian SMS formats
+- Captures sender ID, timestamp, raw message body, and reference ID where present
+- Deduplication logic to avoid double-counting the same transaction across bank and platform SMS
+
+### Live Income Dashboard
+
+- Real-time transaction feed with amount, source, and date
+- Monthly and cumulative earnings aggregation
+- Colour-coded source identification distinguishing platform payouts from generic bank credits
+- Background listener via `RECEIVE_SMS` so new income appears in the dashboard without reopening the app
+
+### Tax Estimation — ITR-4 Presumptive
+
+- Supports all three presumptive taxation modes (44AD digital, 44AD offline, 44ADA professional)
+- Instant taxable income calculation with slab breakdowns
+- Visual summary of estimated tax liability
+- Per-category breakdown when income spans both business and professional categories
+
+### Fully On-Device Processing
+
+- No data transmitted to any server
+- No login or account required
+- Privacy-first design aligned with GDPR and India's DPDP Act
+- Uninstalling the app permanently removes all locally stored financial data, with no remote copy to delete separately
+
+---
+
+## Tax Estimation — ITR-4
+
+GigTax implements India's Presumptive Taxation Scheme under Section 44AD and Section 44ADA of the Income Tax Act.
+
+| Category | Applicable Section | Deemed Profit Rate | Eligible For |
+|---|---|---|---|
+| Digital business | 44AD | 6% of gross turnover | Swiggy, Zomato, Uber partners |
+| Cash or offline business | 44AD | 8% of gross turnover | Offline gig work |
+| Professional services | 44ADA | 50% of gross receipts | Freelancers, consultants |
+
+### Example Calculation
+
+```
+Gross Annual Income (SMS parsed)  : ₹8,00,000
+Category                          : Digital Business (Swiggy delivery)
+Deemed Profit Rate                : 6%
+────────────────────────────────────────────────
+Taxable Income                    : ₹48,000
+Tax Liability (Old Regime)        : ₹0 (below ₹2.5L basic exemption)
+```
+
+### Eligibility Thresholds
+
+| Section | Turnover / Receipts Ceiling | Notes |
+|---|---|---|
+| 44AD | Up to ₹2 crore (₹3 crore if cash receipts ≤ 5%) | Applies to eligible businesses |
+| 44ADA | Up to ₹50 lakh (₹75 lakh if cash receipts ≤ 5%) | Applies to specified professionals |
+
+> **Disclaimer**: GigTax provides estimates only and is not a substitute for professional advice. Eligibility thresholds and slab rates are subject to change with each Finance Act. Consult a qualified Chartered Accountant or tax professional before filing your ITR.
+
+---
+
+## Tax Decision Logic
+
+How GigTax routes a transaction's parsed sender platform to the correct presumptive taxation section, and how mixed-income years are handled.
+
+```mermaid
+flowchart TD
+    START([Total Annual Income - Parsed]) --> SPLIT{Group transactions\nby sender platform}
+
+    SPLIT -->|Delivery / ride-hailing / retail\ne.g. Swiggy, Uber, Zomato| SEC44AD[Section 44AD applies]
+    SPLIT -->|Freelance / consulting / professional\ne.g. Upwork, Urban Company| SEC44ADA[Section 44ADA applies]
+
+    SEC44AD --> RECTYPE{Receipt mode}
+    RECTYPE -->|Digital - UPI / bank transfer| RATE6[6% deemed profit rate]
+    RECTYPE -->|Cash-in-hand| RATE8[8% deemed profit rate]
+
+    SEC44ADA --> RATE50[50% deemed profit rate]
+
+    RATE6 --> SUM[Sum deemed profit\nacross all categories]
+    RATE8 --> SUM
+    RATE50 --> SUM
+
+    SUM --> REGIME{Regime selected\nby user}
+    REGIME -->|Old Regime| SLABOLD[Apply Old Regime slabs\nwith deductions]
+    REGIME -->|New Regime| SLABNEW[Apply New Regime slabs\nno deductions]
+
+    SLABOLD --> FINAL([Final Estimated\nTax Liability])
+    SLABNEW --> FINAL
+```
+
+Where a user earns from both a delivery platform and a freelance platform within the same financial year, GigTax computes each category's deemed profit independently and sums the resulting taxable income before applying slab rates — rather than applying a single blended rate across all income.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| UI Framework | Flutter 3.x | Cross-platform mobile UI |
+| Language | Dart | Business logic and parsing |
+| SMS Access | `telephony` / `flutter_sms_inbox` | Android SMS API bridge |
+| Local Storage | SQLite via `sqflite` | Persistent transaction store |
+| Parsing | Dart RegExp engine | Amount and keyword extraction |
+| State Management | Provider / Riverpod | Reactive UI updates |
+| Platform | Android 6.0+ (API 23+) | Primary target |
+
+---
+
+## Project Structure
+
+```
+gigtax/
++-- lib/
+|   +-- main.dart                  # App entry point
+|   +-- models/
+|   |   +-- transaction.dart       # Transaction data model
+|   +-- services/
+|   |   +-- sms_reader.dart        # SMS inbox access — initial backfill
+|   |   +-- sms_listener.dart      # RECEIVE_SMS broadcast receiver bridge
+|   |   +-- sms_parser.dart        # Regex extraction engine, multi-pattern cascade
+|   |   +-- dedup_service.dart     # Reference ID and composite-key deduplication
+|   |   +-- tax_calculator.dart    # ITR-4 tax logic — 44AD and 44ADA
+|   +-- providers/
+|   |   +-- income_provider.dart   # State management
+|   |   +-- tax_provider.dart      # Tax estimation state and slab selection
+|   +-- screens/
+|   |   +-- dashboard_screen.dart  # Main income view
+|   |   +-- tax_screen.dart        # Tax estimation UI
+|   |   +-- permission_screen.dart # SMS permission flow
+|   +-- widgets/
+|       +-- transaction_card.dart  # Individual SMS card
+|       +-- summary_banner.dart    # Earnings summary
++-- android/
+|   +-- app/src/main/
+|       +-- AndroidManifest.xml    # SMS permissions declared
++-- pubspec.yaml                   # Dependencies
++-- README.md
+```
+
+---
+
+## Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Flutter SDK | >= 3.0.0 | [flutter.dev](https://flutter.dev/) |
+| Android Studio or VS Code | Latest | With the Flutter extension installed |
+| Android device or emulator | API 23+ | Required for the runtime permission model |
+| `READ_SMS` permission | — | Must be enabled on the test device |
+
+---
+
+## Installation
+
 ```bash
-git clone <repo-url>
+# Step 1: Clone the repository
+git clone https://github.com/Thrizzio/SomeRandomProject-forUDI.git
+
+# Step 2: Navigate into the project
 cd SomeRandomProject-forUDI
+
+# Step 3: Install dependencies
 flutter pub get
-```
 
-### 2. Configure Firebase
-```bash
-# Install FlutterFire CLI
-dart pub global activate flutterfire_cli
+# Step 4: Connect a device or start an emulator
+# Ensure USB debugging is enabled on a physical device
 
-# Configure for your Firebase project
-flutterfire configure
-```
-
-**👉 See [FIREBASE_SETUP_GUIDE.md](FIREBASE_SETUP_GUIDE.md) for detailed steps**
-
-### 3. Run the App
-```bash
+# Step 5: Run the app
 flutter run
 ```
 
 ---
 
-## 📚 Documentation
+## Testing SMS Parsing on an Emulator
 
-| Document | Purpose |
-|----------|---------|
-| [PRODUCTION_UPGRADE_GUIDE.md](PRODUCTION_UPGRADE_GUIDE.md) | Complete overview of v2.0.0 changes and best practices |
-| [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) | How to use new services in screens |
-| [FIREBASE_SETUP_GUIDE.md](FIREBASE_SETUP_GUIDE.md) | Step-by-step Firebase configuration |
-| [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) | Testing and verification checklist |
+Emulators do not receive real SMS messages. Use ADB to inject test messages directly:
 
----
-
-## 🔐 Security
-
-### Authentication
-- Email/password authentication via Firebase Auth
-- User credentials never stored locally
-- Automatic session management
-- Secure password reset flow
-
-### Database
-- Cloud Firestore with security rules
-- User-specific data isolation
-- Encrypted data transmission
-- Audit logging
-
-### Permissions
-- `READ_SMS` - Extract transaction data from SMS
-- `RECEIVE_SMS` - Listen for incoming messages
-- `INTERNET` - Cloud sync
-- `ACCESS_NETWORK_STATE` - Connection detection
-
----
-
-## 🛠️ Development Guidelines
-
-### Code Quality
-- ✅ Comprehensive error handling
-- ✅ Production-grade logging
-- ✅ Consistent UI components
-- ✅ Type-safe operations
-
-### Error Handling Pattern
-```dart
-try {
-  // Async operation
-} catch (e, stackTrace) {
-  AppLogger.error('Tag', 'Operation failed', e, stackTrace);
-  _uiState.setError('User-friendly message');
-} finally {
-  _uiState.setLoading(false);
-}
-```
-
-### Adding New Features
-1. Create service class with error handling
-2. Use AppLogger for logging
-3. Integrate with UiStateProvider
-4. Use reusable UI components
-5. Add try-catch to all async operations
-
-### Testing Checklist
-- [ ] Feature works without errors
-- [ ] Error states handled gracefully
-- [ ] Loading indicators shown
-- [ ] Success messages displayed
-- [ ] Offline behavior tested
-- [ ] User data isolation verified
-
----
-
-## 📱 Supported Platforms
-
-- ✅ **Android** - SDK 21+ (primary)
-- ✅ **iOS** - 12.0+ (supported)
-- 🔄 **macOS** - Basic support
-- ⏳ **Windows** - Planned
-- ⏳ **Linux** - Planned
-- ⏳ **Web** - Experimental
-
----
-
-## 🐛 Known Issues & Workarounds
-
-| Issue | Status | Workaround |
-|-------|--------|-----------|
-| SMS access on Android 12+ | Known | Request runtime permissions |
-| Firestore rules complexity | Managed | See FIREBASE_SETUP_GUIDE.md |
-| Background SMS limitations | By design | Foreground listener active during use |
-
----
-
-## 🚀 Performance Tips
-
-1. **Firestore Queries**
-   - Use indexes for frequent queries
-   - Limit result set with pagination
-   - Avoid N+1 queries
-
-2. **UI Optimization**
-   - Use `const` constructors
-   - Avoid unnecessary rebuilds with `.watch()` vs `.read()`
-   - Lazy-load heavy widgets
-
-3. **Memory Management**
-   - Dispose streams and subscriptions
-   - Clear large collections periodically
-   - Monitor Firebase quotas
-
----
-
-## 📊 Production Deployment
-
-### Before Going Live
-- [ ] Firebase project configured
-- [ ] Security rules reviewed and tested
-- [ ] Error logging configured
-- [ ] Backups enabled
-- [ ] Performance optimized
-- [ ] User testing completed
-- [ ] Rollback plan prepared
-
-### Deployment Steps
 ```bash
-# Build release APK (Android)
-flutter build apk --release
+# Send a test income SMS
+adb emu sms send SWIGGY "Your earnings of Rs.340.00 have been credited to your bank account."
 
-# Build release IPA (iOS)
-flutter build ipa --release
+# Send a Uber payout SMS
+adb emu sms send UBERIND "Congrats! Rs.1250 has been transferred to your account ending 4321."
 
-# Deploy via App Store / Play Store
+# Send a professional services payout
+adb emu sms send UPWORK "Your invoice payment of INR 22,500 has been received."
+
+# Send a non-financial SMS to confirm it is correctly ignored
+adb emu sms send VM-AMAZON "Your OTP for login is 482913. Do not share this with anyone."
 ```
 
-See [FIREBASE_SETUP_GUIDE.md](FIREBASE_SETUP_GUIDE.md) for production checklist.
+---
+
+## Permissions
+
+GigTax requires the following Android permissions:
+
+| Permission | Why It's Needed |
+|---|---|
+| `READ_SMS` | To scan the existing SMS inbox for income messages |
+| `RECEIVE_SMS` | To detect and parse new incoming income SMS in real time |
+
+> **Privacy commitment**: All SMS processing happens entirely on-device. No message content, phone number, or financial data is ever transmitted to any external server or third party.
 
 ---
 
-## 🤝 Contributing
+## Security and Privacy Model
 
-### Code Standards
-- Follow Dart style guide
-- Add error handling to all async operations
-- Use AppLogger instead of print()
-- Add unit tests for critical functions
-- Document complex logic
-
-### Pull Request Process
-1. Create feature branch
-2. Implement with error handling
-3. Add tests
-4. Update documentation
-5. Submit PR with description
+- **No network calls** — the application has no networking dependency in its core data path. There is nothing to intercept in transit because nothing is transmitted.
+- **No analytics SDKs** — no third-party crash reporting, usage analytics, or advertising SDKs are bundled, all of which are common vectors for unintentional data exfiltration in consumer apps.
+- **Local-only storage** — SQLite database files are sandboxed within Android's app-private storage and are not accessible to other apps without root access.
+- **Raw message retention** — the original SMS body is retained in the local database for audit purposes (so a user can verify why a transaction was classified a certain way), but this is configurable and can be purged independently of the parsed transaction record in a future release.
+- **No cloud backup by default** — Android's automatic app data backup is explicitly excluded in the manifest configuration to prevent financial data from being included in unencrypted device backups.
 
 ---
 
-## 📞 Support & Troubleshooting
+## Demo Flow
 
-### Common Issues
+```
+Launch GigTax
+     |
+     v
+Grant READ_SMS Permission
+     |
+     v
+App Scans SMS Inbox
+     |
+     +-- Finds "Rs.340 credited" from SWIGGY
+     +-- Finds "Rs.1250 transferred" from UBERIND
+     +-- Ignores OTPs and promotional messages
+     |
+     v
+Displays Parsed Transaction List
 
-**Q: Firebase not initializing?**
-A: Ensure `flutterfire configure` was run and `firebase_options.dart` is correct.
+  SWIGGY     ₹340     Oct 12, 2024
+  UBERIND    ₹1250    Oct 14, 2024
+  SWIGGY     ₹520     Oct 16, 2024
 
-**Q: Permission denied in Firestore?**
-A: Check security rules and user authentication status.
-
-**Q: SMS not being detected?**
-A: Verify SMS permissions are granted and app is in foreground.
-
-See [FIREBASE_SETUP_GUIDE.md](FIREBASE_SETUP_GUIDE.md#-troubleshooting) for more solutions.
-
----
-
-## 📈 Future Roadmap
-
-### Q2 2026
-- [ ] Google Sign-In integration
-- [ ] App Store / Play Store release
-- [ ] Analytics dashboard
-- [ ] Expense tracking
-
-### Q3 2026
-- [ ] Offline data sync
-- [ ] Multiple account support
-- [ ] Tax filing integration
-- [ ] Multi-language support
-
-### Q4 2026
-- [ ] Apple Sign-In
-- [ ] Advanced analytics
-- [ ] API integration
-- [ ] Premium features
+     |
+     v
+Shows Total: ₹2,110 this month
+     |
+     v
+Estimated Taxable Income: ₹1,266 (6% presumptive)
+```
 
 ---
 
-## 📄 License
+## Known Limitations
 
-[Add your license here]
-
----
-
-## ⚠️ Disclaimer
-
-GigTax is a tax tracking tool designed for Indian gig workers under ITR-4 presumptive taxation. It is **not** a substitute for professional tax advice. Please consult with a tax professional for accurate filing.
-
----
-
-**Last Updated:** April 26, 2026
-**Current Version:** 2.0.0-production
-**Status:** ✅ Production Ready
-
-
-- SMS formats vary across platforms  
-- Cannot always distinguish personal vs income transactions automatically  
-- No bank/API integration (MVP constraint)  
-- SMS access restricted on some Android versions/devices  
+- **SMS format variance** — each platform uses different message templates, so some edge cases may be missed
+- **False positives** — personal credits such as gifts or refunds may be misclassified as income
+- **Imperfect deduplication** — reference-ID matching works well when present, but the composite-key fallback can still occasionally miscount a payout that appears in both bank and platform SMS with no shared reference number
+- **Android-only** — iOS restricts third-party SMS access at the OS level, so there is currently no path to an iOS version without a fundamentally different data source
+- **API 23+ required** — the runtime permission model is unavailable on older Android versions
+- **No expense tracking** — the MVP provides income-side visibility only, so net profit (after deducting fuel, platform commissions, or data costs) is not yet calculated
+- **No multi-device sync** — transaction history does not currently follow a user across devices
 
 ---
 
-## 🔮 Future Improvements
+## Frequently Asked Questions
 
-- AI-based classification of transactions  
-- Deduplication (bank SMS + platform SMS)  
-- Expense tracking  
-- Direct ITR filing integration  
-- Cloud sync & analytics  
+**Does GigTax read all of my SMS, including personal messages?**
+The app requests broad SMS read access because Android does not offer a way to request access to only "financial" SMS. However, only messages that pass the keyword and sender filtering stage are ever parsed into structured data or stored. Unrelated messages are read in memory during the scan and immediately discarded — they are never written to the local database.
 
----
+**What happens if I switch phones?**
+Since all data is stored locally with no cloud sync in the current MVP, transaction history does not transfer automatically. Cloud backup and cross-device sync are tracked on the Phase 3 roadmap.
 
-## 🧪 Demo Flow
+**Can GigTax file my ITR directly?**
+Not yet. The current MVP produces an estimate intended to inform your filing, not a submission-ready return. Direct ITR export is planned for Phase 3.
 
-1. Launch app  
-2. Grant SMS permission  
-3. View parsed income messages  
-4. See total earnings  
-5. View estimated taxable income  
+**Is the 6% vs 8% vs 50% rate something I choose, or is it determined automatically?**
+GigTax infers the likely category based on the sender platform (for example, delivery and ride-hailing platforms default to the 6% digital business rate under 44AD), but the category is always user-editable per transaction in case the automatic classification is incorrect.
 
 ---
 
-## 🏆 Hackathon Focus
+## Roadmap
 
-This project prioritizes:
-
-- Real-world problem relevance  
-- Practical implementation  
-- Working prototype over theoretical completeness  
+| Phase | Feature | Status |
+|---|---|---|
+| MVP | SMS parsing, income dashboard, tax estimation | Done |
+| MVP | Reference-ID based deduplication | Done |
+| Phase 2 | AI-based transaction classification (income vs. personal) | Planned |
+| Phase 2 | Expense tracking (platform fees, fuel, data costs) | Planned |
+| Phase 2 | Smart deduplication across bank and platform SMS | Planned |
+| Phase 2 | Old vs. New tax regime comparison toggle | Planned |
+| Phase 3 | Cloud backup and cross-device sync | Planned |
+| Phase 3 | Pre-filled ITR-4 export (JSON / PDF) | Planned |
+| Phase 3 | Hindi and regional language SMS support | Planned |
+| Phase 3 | Configurable raw-message retention and purge controls | Planned |
 
 ---
 
-## 📂 Setup Instructions
+## Contributing
 
-```mermaid
-flowchart TD
-    A["git clone https://github.com/Thrizzio/SomeRandomProject-forUDI.git"] --> B["cd SomeRandomProject-forUDI"]
-    B --> C["flutter pub get"]
-    C --> D["Start Emulator / Connect Device"]
-    D --> E["flutter run"]
+```bash
+# Fork the repository, then:
+git checkout -b feature/your-feature-name
+git commit -m "feat: describe your change"
+git push origin feature/your-feature-name
+# Open a Pull Request
+```
+
+Please follow [Conventional Commits](https://www.conventionalcommits.org/) and open an issue before starting work on any major change.
+
+### Adding Support for a New Sender Pattern
+
+If you receive income SMS from a platform GigTax does not yet recognise:
+
+1. Add the sender ID to the allowlist in `services/sms_parser.dart`
+2. Add a representative sample message (with the amount redacted) to the test fixtures
+3. Confirm the existing regex cascade correctly extracts the amount, or add a new pattern if the format is unusual
+4. Open a Pull Request referencing the platform name in the title
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+**GigTax** — [Report Bug](https://github.com/Thrizzio/SomeRandomProject-forUDI/issues) · [Request Feature](https://github.com/Thrizzio/SomeRandomProject-forUDI/issues)
