@@ -14,16 +14,26 @@ import 'package:flutter/foundation.dart'
 /// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    FirebaseOptions options;
+
     if (kIsWeb) {
-      return web;
+      options = web;
+      _validateConfigured(options, 'web');
+      return options;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return android;
+        options = android;
+        _validateConfigured(options, 'android');
+        return options;
       case TargetPlatform.iOS:
-        return ios;
+        options = ios;
+        _validateConfigured(options, 'ios');
+        return options;
       case TargetPlatform.macOS:
-        return macos;
+        options = macos;
+        _validateConfigured(options, 'macos');
+        return options;
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
@@ -38,6 +48,25 @@ class DefaultFirebaseOptions {
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
         );
+    }
+  }
+
+  static void _validateConfigured(FirebaseOptions options, String platform) {
+    final looksPlaceholder = <String>[
+      options.apiKey,
+      options.appId,
+      options.messagingSenderId,
+      options.projectId,
+    ].any((value) =>
+        value.trim().isEmpty ||
+        value.contains('YOUR_') ||
+        value.contains('your-firebase-project-id'));
+
+    if (looksPlaceholder) {
+      throw UnsupportedError(
+        'Firebase options for $platform are still placeholder values. '
+        'Run `flutterfire configure` and replace lib/firebase_options.dart before shipping.',
+      );
     }
   }
 

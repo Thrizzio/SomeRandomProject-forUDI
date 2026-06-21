@@ -84,10 +84,15 @@ class BackgroundSmsService {
     try {
       AppLogger.info(_tag, 'Starting listener...');
 
+
+      // Listen to incoming SMS messages in foreground/background using telephony
+
+
       telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) {
           _handleIncomingSms(message);
         },
+        onBackgroundMessage: telephonyBackgroundHandler,
         listenInBackground: true,
       );
 
@@ -111,8 +116,13 @@ class BackgroundSmsService {
       return;
     }
 
+
+    try {
+      AppLogger.info(_tag, 'Stopping listener...');
+
       try {
         AppLogger.info(_tag, 'Stopping listener...');
+
       _isListening = false;
 
       // Save listener state
@@ -128,6 +138,12 @@ class BackgroundSmsService {
   /// Handle incoming SMS message
   Future<void> _handleIncomingSms(SmsMessage message) async {
     try {
+      final isActive = await isListenerActive();
+      if (!isActive && !_isListening) {
+        AppLogger.debug(_tag, 'Ignored SMS: listener is not active');
+        return;
+      }
+
       AppLogger.debug(_tag, 'Received SMS from: ${message.address}');
 
       // Parse the SMS using existing parser
@@ -242,4 +258,11 @@ void callbackDispatcher() {
     }
     return false;
   });
+}
+
+/// Global background SMS handler for Telephony
+@pragma('vm:entry-point')
+void telephonyBackgroundHandler(SmsMessage message) {
+  // Delegate background messages to our service's handler
+  BackgroundSmsService()._handleIncomingSms(message);
 }

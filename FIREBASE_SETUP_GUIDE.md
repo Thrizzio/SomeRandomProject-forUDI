@@ -55,6 +55,56 @@ Which platforms should your configuration support?
 
 ---
 
+## 🧪 Running the app on a friend's PC
+
+If your own PC does not have Flutter installed, the app can still be run on a friend's PC that has the Flutter SDK set up.
+
+### What your friend needs
+
+- Flutter SDK installed
+- Android Studio or a connected Android device
+- Git installed
+- This project folder cloned or copied
+
+### Quick run steps
+
+1. Open the project folder in terminal
+2. Verify Flutter is available:
+
+```bash
+flutter --version
+```
+
+3. Fetch dependencies:
+
+```bash
+flutter pub get
+```
+
+4. Configure Firebase if not already done:
+
+```bash
+flutterfire configure
+```
+
+5. Make sure `lib/firebase_options.dart` contains real Firebase values, not placeholders.
+6. Connect a phone or start an emulator.
+7. Run the app:
+
+```bash
+flutter run
+```
+
+### If Flutter is not installed on the friend's PC
+
+Install Flutter first, then run the same steps above.
+
+### Common issue to watch for
+
+This project will not fully start if Firebase options are still placeholders. In that case, fix `firebase_options.dart` before running.
+
+---
+
 ### Step 4: Update firebase_options.dart
 
 After running `flutterfire configure`, your `firebase_options.dart` will be automatically updated. Verify it contains your Firebase credentials:
