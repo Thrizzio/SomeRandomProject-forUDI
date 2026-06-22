@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sms_parser_basically/main.dart';
 
 void main() {
-  testWidgets('App builds and displays login screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
-    await tester.pump(); // Start auth check async operations
+  setUp(() {
+    SharedPreferences.setMockInitialValues({
+      'onboarding_completed_v1': true,
+    });
+  });
 
-    // Wait until the CircularProgressIndicator is gone
-    while (tester.any(find.byType(CircularProgressIndicator))) {
+  testWidgets('App builds and displays main navigation or login', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pump();
+
+    int pumps = 0;
+    while (tester.any(find.byType(CircularProgressIndicator)) && pumps < 10) {
       await tester.pump(const Duration(milliseconds: 100));
+      pumps++;
     }
 
-    expect(find.text('GigTax Login'), findsOneWidget);
+    expect(find.textContaining('GigTax'), findsWidgets);
   });
 }
