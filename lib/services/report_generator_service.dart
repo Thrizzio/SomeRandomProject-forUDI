@@ -21,6 +21,7 @@ class ReportGeneratorService {
     required double totalIncome,
     required double taxableIncome,
     required double taxPayable,
+    double totalExpenses = 0.0,
     String reportType = 'income_summary',
     TaxProfile? taxProfile,
   }) async {
@@ -32,6 +33,7 @@ class ReportGeneratorService {
       final sourceTotals = <String, double>{};
       final sourceCounts = <String, int>{};
       for (final tx in transactions) {
+        if (tx.transactionType == 'expense') continue;
         final double amt = double.tryParse(
               tx.amount.replaceAll(',', '').replaceAll('INR', '').replaceAll('₹', '').replaceAll('Rs', '').trim(),
             ) ??
@@ -90,7 +92,7 @@ class ReportGeneratorService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   _buildKpiCard('Gross Receipts', 'INR ${totalIncome.toStringAsFixed(2)}'),
-                  _buildKpiCard('Presumptive Profit', 'INR ${taxableIncome.toStringAsFixed(2)}'),
+                  _buildKpiCard('Expenses Logged', 'INR ${totalExpenses.toStringAsFixed(2)}'),
                   _buildKpiCard('Tax Estimate', 'INR ${taxPayable.toStringAsFixed(2)}'),
                 ],
               ),
@@ -98,7 +100,7 @@ class ReportGeneratorService {
 
               // Dynamic content based on reportType
               if (reportType == 'annual_tax' && taxProfile != null)
-                ..._buildAnnualTaxReportSection(taxProfile, totalIncome)
+                ..._buildAnnualTaxReportSection(taxProfile, totalIncome, totalExpenses)
               else if (reportType == 'quarterly_tax')
                 ..._buildQuarterlyTaxReportSection(taxPayable, transactions)
               else if (reportType == 'client_revenue')
@@ -148,8 +150,8 @@ class ReportGeneratorService {
   }
 
   /// 1. Annual Tax Report Section
-  static List<pw.Widget> _buildAnnualTaxReportSection(TaxProfile profile, double gross) {
-    final comparison = TaxEngineV2.compareRegimes(grossIncome: gross, profile: profile);
+  static List<pw.Widget> _buildAnnualTaxReportSection(TaxProfile profile, double gross, double totalExpenses) {
+    final comparison = TaxEngineV2.compareRegimes(grossIncome: gross, profile: profile, totalExpenses: totalExpenses);
     final currentResult = profile.taxRegime == 'new' 
         ? comparison['newRegimeResult'] as TaxCalculationResult 
         : comparison['oldRegimeResult'] as TaxCalculationResult;

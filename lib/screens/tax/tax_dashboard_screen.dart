@@ -858,6 +858,7 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
                   totalIncome: taxProvider.totalIncome,
                   taxableIncome: taxProvider.taxCalculationResult.netTaxableIncome,
                   taxPayable: taxProvider.taxCalculationResult.totalTaxDue,
+                  totalExpenses: taxProvider.totalExpenses,
                   reportType: _selectedReportType,
                   taxProfile: taxProvider.profile,
                 );
