@@ -46,6 +46,12 @@ class _TransactionCenterScreenState extends State<TransactionCenterScreen> {
 
     return Scaffold(
       backgroundColor: _isDark ? DesignSystem.backgroundDark : DesignSystem.backgroundLight,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: DesignSystem.primary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Log Expense', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        onPressed: () => _showLogExpenseBottomSheet(context),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -229,6 +235,7 @@ class _TransactionCenterScreenState extends State<TransactionCenterScreen> {
   }
 
   Widget _buildTransactionTile(Transaction tx, double amt) {
+    final isExpense = tx.transactionType == 'expense';
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: DesignSystem.sm),
@@ -239,10 +246,10 @@ class _TransactionCenterScreenState extends State<TransactionCenterScreen> {
       ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: DesignSystem.primary.withValues(alpha: 0.1),
+          backgroundColor: (isExpense ? DesignSystem.error : DesignSystem.primary).withValues(alpha: 0.1),
           child: Text(
             tx.sender.isNotEmpty ? tx.sender[0].toUpperCase() : '?',
-            style: const TextStyle(color: DesignSystem.primary, fontWeight: FontWeight.bold),
+            style: TextStyle(color: isExpense ? DesignSystem.error : DesignSystem.primary, fontWeight: FontWeight.bold),
           ),
         ),
         title: Text(
@@ -253,15 +260,209 @@ class _TransactionCenterScreenState extends State<TransactionCenterScreen> {
             fontSize: 14,
           ),
         ),
-        subtitle: Text(
-          tx.date.substring(0, 10),
-          style: const TextStyle(color: Colors.grey, fontSize: 11),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              tx.date.substring(0, 10),
+              style: const TextStyle(color: Colors.grey, fontSize: 11),
+            ),
+            if (tx.classification != null)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: (isExpense ? DesignSystem.error : DesignSystem.primary).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  tx.classification!,
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: isExpense ? DesignSystem.error : DesignSystem.primary,
+                  ),
+                ),
+              ),
+          ],
         ),
         trailing: Text(
-          '+₹${amt.toStringAsFixed(2)}',
-          style: const TextStyle(color: DesignSystem.success, fontWeight: FontWeight.bold, fontSize: 15),
+          isExpense ? '-₹${amt.toStringAsFixed(2)}' : '+₹${amt.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: isExpense ? DesignSystem.error : DesignSystem.success,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
         ),
       ),
+    );
+  }
+
+  void _showLogExpenseBottomSheet(BuildContext context) {
+    final amountController = TextEditingController();
+    final payeeController = TextEditingController();
+    final notesController = TextEditingController();
+    String category = 'Fuel / Commute';
+    DateTime selectedDate = DateTime.now();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _isDark ? DesignSystem.backgroundDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + DesignSystem.lg,
+                left: DesignSystem.lg,
+                right: DesignSystem.lg,
+                top: DesignSystem.lg,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Log Business Expense',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: _isDark ? Colors.white : Colors.black87,
+                          ),
+                    ),
+                    const SizedBox(height: DesignSystem.md),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: _isDark ? Colors.white : Colors.black87),
+                      decoration: const InputDecoration(
+                        labelText: 'Amount (INR)',
+                        prefixText: '₹ ',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: DesignSystem.md),
+                    TextField(
+                      controller: payeeController,
+                      style: TextStyle(color: _isDark ? Colors.white : Colors.black87),
+                      decoration: const InputDecoration(
+                        labelText: 'Merchant / Payee',
+                        hintText: 'e.g. Shell Petrol Pump, Uber Fees',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: DesignSystem.md),
+                    DropdownButtonFormField<String>(
+                      value: category,
+                      dropdownColor: _isDark ? DesignSystem.backgroundDark : Colors.white,
+                      style: TextStyle(color: _isDark ? Colors.white : Colors.black87),
+                      decoration: const InputDecoration(
+                        labelText: 'Expense Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Fuel / Commute', child: Text('Fuel / Commute')),
+                        DropdownMenuItem(value: 'Platform Commissions', child: Text('Platform Commissions')),
+                        DropdownMenuItem(value: 'Mobile / Internet Bill', child: Text('Mobile / Internet Bill')),
+                        DropdownMenuItem(value: 'Rent / Workspace', child: Text('Rent / Workspace')),
+                        DropdownMenuItem(value: 'Supplies / Hardware', child: Text('Supplies / Hardware')),
+                        DropdownMenuItem(value: 'Other Business Expense', child: Text('Other Business Expense')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => category = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: DesignSystem.md),
+                    TextField(
+                      controller: notesController,
+                      style: TextStyle(color: _isDark ? Colors.white : Colors.black87),
+                      decoration: const InputDecoration(
+                        labelText: 'Notes / Description (Optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: DesignSystem.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Date: ${selectedDate.toLocal().toString().substring(0, 10)}',
+                          style: TextStyle(color: _isDark ? Colors.white70 : Colors.black87),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2030),
+                            );
+                            if (picked != null) {
+                              setModalState(() => selectedDate = picked);
+                            }
+                          },
+                          child: const Text('Change Date'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DesignSystem.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: DesignSystem.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () async {
+                          if (amountController.text.isEmpty || payeeController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please fill out Amount and Merchant fields.')),
+                            );
+                            return;
+                          }
+                          final tx = Transaction(
+                            amount: amountController.text,
+                            sender: payeeController.text,
+                            messageBody: notesController.text.isNotEmpty
+                                ? notesController.text
+                                : 'Manual expense: $category',
+                            transactionType: 'expense',
+                            date: selectedDate.toIso8601String(),
+                            classification: category,
+                            confidence: 1.0,
+                            source: payeeController.text,
+                          );
+
+                          await DatabaseService.insertTransaction(tx);
+                          try {
+                            await _firestore.addTransaction(tx).timeout(const Duration(seconds: 2));
+                          } catch (_) {}
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Expense logged successfully!')),
+                            );
+                          }
+                        },
+                        child: const Text('Save Expense', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
