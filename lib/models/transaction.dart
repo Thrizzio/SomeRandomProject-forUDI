@@ -6,6 +6,9 @@ class Transaction {
   final String transactionType; // 'income' or 'expense'
   final String date; // ISO8601 string for Firestore compatibility
   final String createdAt; // ISO8601 string
+  final String? classification;
+  final double? confidence;
+  final String? source;
 
   Transaction({
     this.id,
@@ -15,6 +18,9 @@ class Transaction {
     required this.transactionType,
     required this.date,
     String? createdAt,
+    this.classification,
+    this.confidence,
+    this.source,
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String();
 
   /// Validate transaction data
@@ -35,6 +41,9 @@ class Transaction {
       'transactionType': transactionType,
       'date': date,
       'createdAt': createdAt,
+      if (classification != null) 'classification': classification,
+      if (confidence != null) 'confidence': confidence,
+      if (source != null) 'source': source,
     };
   }
 
@@ -49,6 +58,9 @@ class Transaction {
         transactionType: json['transactionType']?.toString() ?? 'income',
         date: json['date']?.toString() ?? DateTime.now().toIso8601String(),
         createdAt: json['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+        classification: json['classification'] as String?,
+        confidence: json['confidence'] != null ? (json['confidence'] as num).toDouble() : null,
+        source: json['source'] as String?,
       );
     } catch (e) {
       throw Exception('Failed to parse transaction from JSON: $e');
@@ -64,6 +76,9 @@ class Transaction {
     String? transactionType,
     String? date,
     String? createdAt,
+    String? classification,
+    double? confidence,
+    String? source,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -73,6 +88,9 @@ class Transaction {
       transactionType: transactionType ?? this.transactionType,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
+      classification: classification ?? this.classification,
+      confidence: confidence ?? this.confidence,
+      source: source ?? this.source,
     );
   }
 
@@ -96,7 +114,7 @@ class Transaction {
 
   @override
   String toString() =>
-      'Transaction(id: $id, amount: $amount, sender: $sender, type: $transactionType, date: $date)';
+      'Transaction(id: $id, amount: $amount, sender: $sender, type: $transactionType, date: $date, classification: $classification, confidence: $confidence)';
 
   @override
   bool operator ==(Object other) =>

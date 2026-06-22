@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class DatabaseService {
   static const String _dbName = 'sms_transactions.db';
-  static const int _version = 2;
+  static const int _version = 3;
   static const String _tableName = 'transactions';
 
   static Database? _database;
@@ -77,12 +77,15 @@ class DatabaseService {
         date TEXT NOT NULL,
         userEmail TEXT,
         createdAt TEXT NOT NULL,
+        classification TEXT,
+        confidence REAL,
+        source TEXT,
         UNIQUE(amount, sender, date, userEmail)
       )
     ''');
   }
 
-  /// Handle database upgrade - Rebuild table with new UNIQUE constraint
+  /// Handle database upgrade - Rebuild table with new UNIQUE constraint and add AI columns
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.transaction((txn) async {
@@ -119,6 +122,15 @@ class DatabaseService {
           rethrow;
         }
       });
+    }
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN classification TEXT');
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN confidence REAL');
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN source TEXT');
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
