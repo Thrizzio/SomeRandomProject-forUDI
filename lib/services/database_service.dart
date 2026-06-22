@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class DatabaseService {
   static const String _dbName = 'sms_transactions.db';
-  static const int _version = 2;
+  static const int _version = 3;
   static const String _tableName = 'transactions';
 
   static Database? _database;
@@ -16,6 +16,7 @@ class DatabaseService {
   // Web fallback storage
   static final List<Transaction> _webTransactions = [];
   static bool _webLoaded = false;
+  static bool useWebFallback = false;
 
   static Future<void> _loadWebTransactions() async {
     try {
@@ -77,12 +78,15 @@ class DatabaseService {
         date TEXT NOT NULL,
         userEmail TEXT,
         createdAt TEXT NOT NULL,
+        classification TEXT,
+        confidence REAL,
+        source TEXT,
         UNIQUE(amount, sender, date, userEmail)
       )
     ''');
   }
 
-  /// Handle database upgrade - Rebuild table with new UNIQUE constraint
+  /// Handle database upgrade - Rebuild table with new UNIQUE constraint and add AI columns
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.transaction((txn) async {
@@ -120,6 +124,15 @@ class DatabaseService {
         }
       });
     }
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN classification TEXT');
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN confidence REAL');
+        await db.execute('ALTER TABLE $_tableName ADD COLUMN source TEXT');
+      } catch (e) {
+        // ignore
+      }
+    }
   }
 
   /// Insert transaction
@@ -132,7 +145,7 @@ class DatabaseService {
         throw Exception('Cannot insert transaction: no user logged in');
       }
 
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         // Prevent duplicate unique constraint: UNIQUE(amount, sender, date, userEmail)
         final duplicate = _webTransactions.any((t) =>
@@ -173,7 +186,7 @@ class DatabaseService {
   /// Get all transactions for current user
   static Future<List<Transaction>> getAllTransactions() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final list = List<Transaction>.from(_webTransactions);
         list.sort((a, b) => b.date.compareTo(a.date));
@@ -201,7 +214,7 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByType(
       String transactionType) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final list = _webTransactions
             .where((t) => t.transactionType == transactionType)
@@ -231,7 +244,7 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByDateRange(
       DateTime startDate, DateTime endDate) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final startIso = startDate.toIso8601String();
         final endIso = endDate.toIso8601String();
@@ -266,7 +279,7 @@ class DatabaseService {
   /// Get transaction count for current user
   static Future<int> getTransactionCount() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         return _webTransactions.length;
       }
@@ -287,7 +300,7 @@ class DatabaseService {
   /// Get total amount by type for current user
   static Future<double> getTotalAmountByType(String transactionType) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         double sum = 0.0;
         for (final t in _webTransactions) {
@@ -339,7 +352,7 @@ class DatabaseService {
   /// Delete transaction
   static Future<int> deleteTransaction(int id) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final index = _webTransactions.indexWhere((t) => t.id == id.toString());
         if (index != -1) {
@@ -364,7 +377,7 @@ class DatabaseService {
   /// Clear all transactions
   static Future<int> clearAllTransactions() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         _webTransactions.clear();
         await _saveWebTransactions();
         return 1;
@@ -379,7 +392,7 @@ class DatabaseService {
 
   /// Close database
   static Future<void> closeDatabase() async {
-    if (kIsWeb) return;
+    if (kIsWeb || useWebFallback) return;
     if (_database != null) {
       await _database!.close();
       _database = null;

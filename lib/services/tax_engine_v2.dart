@@ -69,8 +69,9 @@ class TaxEngineV2 {
   static TaxCalculationResult calculateNewRegime({
     required double grossIncome,
     required double presumptiveProfit,
+    double totalExpenses = 0.0,
   }) {
-    final netTaxable = presumptiveProfit; // Deductions not allowed under new regime (Section 115BAC)
+    final netTaxable = (presumptiveProfit - totalExpenses) < 0.0 ? 0.0 : (presumptiveProfit - totalExpenses);
     
     final List<SlabBreakdown> slabs = [];
     double tempIncome = netTaxable;
@@ -170,9 +171,10 @@ class TaxEngineV2 {
     required double grossIncome,
     required double presumptiveProfit,
     required TaxDeductions deductions,
+    double totalExpenses = 0.0,
   }) {
     final double totalDeductions = deductions.getTotalDeductions();
-    final double netTaxable = (presumptiveProfit - totalDeductions) < 0.0 ? 0.0 : (presumptiveProfit - totalDeductions);
+    final double netTaxable = (presumptiveProfit - totalExpenses - totalDeductions) < 0.0 ? 0.0 : (presumptiveProfit - totalExpenses - totalDeductions);
 
     final List<SlabBreakdown> slabs = [];
     double tax = 0.0;
@@ -250,6 +252,7 @@ class TaxEngineV2 {
   static TaxCalculationResult calculateTax({
     required double grossIncome,
     required TaxProfile profile,
+    double totalExpenses = 0.0,
   }) {
     final double presumptiveProfit = computePresumptiveProfit(grossIncome, profile.businessCategory);
     
@@ -257,12 +260,14 @@ class TaxEngineV2 {
       return calculateNewRegime(
         grossIncome: grossIncome,
         presumptiveProfit: presumptiveProfit,
+        totalExpenses: totalExpenses,
       );
     } else {
       return calculateOldRegime(
         grossIncome: grossIncome,
         presumptiveProfit: presumptiveProfit,
         deductions: profile.deductions,
+        totalExpenses: totalExpenses,
       );
     }
   }
@@ -313,11 +318,12 @@ class TaxEngineV2 {
   static Map<String, dynamic> compareRegimes({
     required double grossIncome,
     required TaxProfile profile,
+    double totalExpenses = 0.0,
   }) {
     final double presumptiveProfit = computePresumptiveProfit(grossIncome, profile.businessCategory);
     
-    final newResult = calculateNewRegime(grossIncome: grossIncome, presumptiveProfit: presumptiveProfit);
-    final oldResult = calculateOldRegime(grossIncome: grossIncome, presumptiveProfit: presumptiveProfit, deductions: profile.deductions);
+    final newResult = calculateNewRegime(grossIncome: grossIncome, presumptiveProfit: presumptiveProfit, totalExpenses: totalExpenses);
+    final oldResult = calculateOldRegime(grossIncome: grossIncome, presumptiveProfit: presumptiveProfit, deductions: profile.deductions, totalExpenses: totalExpenses);
 
     final double savings = (oldResult.totalTaxDue - newResult.totalTaxDue).abs();
     final String recommendedRegime = newResult.totalTaxDue < oldResult.totalTaxDue ? 'new' : 'old';

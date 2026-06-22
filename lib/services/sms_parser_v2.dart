@@ -1,5 +1,6 @@
 import '../models/parsed_transaction.dart';
 import 'app_logger.dart';
+import 'ai_classifier_service.dart';
 
 class SmsParserV2 {
   static const String _tag = 'SmsParserV2';
@@ -60,8 +61,8 @@ class SmsParserV2 {
       // 6. Source Normalization
       final source = _normalizeSource(text, senderName);
 
-      // 7. Transaction Classification
-      final classification = _classifyTransaction(text, amount, source);
+      // 7. Transaction Classification using AI
+      final aiResult = AiClassifierService.classify(text, amount: amount, source: source);
 
       return ParsedTransaction(
         amount: amount,
@@ -72,8 +73,8 @@ class SmsParserV2 {
         bank: bank,
         rawMessage: text,
         isCredit: true,
-        confidence: 0.95,
-        classification: classification,
+        confidence: aiResult.confidence,
+        classification: aiResult.classification,
         source: source,
       );
     } catch (e, stackTrace) {
@@ -92,7 +93,11 @@ class SmsParserV2 {
         lower.contains('withdrawn') ||
         lower.contains('spent') ||
         lower.contains('paid to') ||
-        lower.contains('sent to')) {
+        lower.contains('sent to') ||
+        lower.contains('निकाले') ||
+        lower.contains('काटे') ||
+        lower.contains('डेबिट') ||
+        lower.contains('भुगतान')) {
       return false;
     }
 
@@ -108,6 +113,10 @@ class SmsParserV2 {
       'cr.',
       'credited to',
       'reversal of',
+      'प्राप्त',
+      'जमा',
+      'खाते में',
+      'क्रेडिट',
     ];
 
     for (final indicator in creditIndicators) {
@@ -176,9 +185,9 @@ class SmsParserV2 {
     
     // Regular expressions for Indian currency credit transactions
     final patterns = [
-      RegExp(r'(?:rs|inr|val|amount)\.?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'(?:credited\s+with|credited\s+for|received|deposited)\s*(?:rs|inr)?\.?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'([\d,]+(?:\.\d{1,2})?)\s*(?:credited|received|deposited|added)', caseSensitive: false),
+      RegExp(r'(?:rs|inr|val|amount|रुपये|रूपये)\.?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'(?:credited\s+with|credited\s+for|received|deposited|जमा|प्राप्त)\s*(?:rs|inr)?\.?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'([\d,]+(?:\.\d{1,2})?)\s*(?:credited|received|deposited|added|जमा|प्राप्त)', caseSensitive: false),
       RegExp(r'₹\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
     ];
 

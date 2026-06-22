@@ -161,6 +161,37 @@ void main() {
         'body': 'Paytm payment of Rs 1,250.00 unsuccessful. Amount will be refunded if debited.',
         'isCredit': false,
       },
+      {
+        'body': 'प्रिय ग्राहक, आपके SBI खाते में Rs. 15,000.00 जमा किए गए हैं। UPI Ref 418293849102.',
+        'isCredit': true,
+        'amount': 15000.0,
+        'bank': 'SBI',
+        'platform': 'UPI',
+        'ref': '418293849102',
+        'source': 'Other',
+      },
+      {
+        'body': 'HDFC Bank: ₹3,500.00 प्राप्त हुए a/c X9081 पर। Ref: 489012398471.',
+        'isCredit': true,
+        'amount': 3500.0,
+        'bank': 'HDFC',
+        'platform': 'UPI',
+        'ref': '489012398471',
+        'source': 'Other',
+      },
+      {
+        'body': 'Paytm: Rs 450 जमा हुआ। Ref: PYTM908123.',
+        'isCredit': true,
+        'amount': 450.0,
+        'bank': 'Unknown',
+        'platform': 'Paytm',
+        'ref': 'pytm908123',
+        'source': 'Other',
+      },
+      {
+        'body': 'खाते से Rs. 500 निकाले गए हैं।',
+        'isCredit': false,
+      },
     ];
 
     // Generate dynamic test credit samples to reach 100+ cases

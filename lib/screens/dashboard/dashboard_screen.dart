@@ -9,6 +9,9 @@ import '../../services/notification_service.dart';
 import '../../theme/design_system.dart';
 import '../bank_statement/bank_statement_upload_page.dart';
 import '../../widgets/suggestion_card.dart';
+import '../../services/tax_engine_v2.dart';
+import '../../services/tax_profile_service.dart';
+import '../../models/tax_profile.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -64,6 +67,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  Future<Map<String, dynamic>> _fetchDashboardData() async {
+    try {
+      final transactions = await _fetchTransactions();
+      final profile = await TaxProfileService.getProfile();
+      return {
+        'transactions': transactions,
+        'profile': profile,
+      };
+    } catch (e) {
+      return {
+        'transactions': <Transaction>[],
+        'profile': TaxProfile.defaultProfile(),
+      };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     _isDark = Theme.of(context).brightness == Brightness.dark;
@@ -71,8 +90,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: _isDark ? DesignSystem.backgroundDark : DesignSystem.backgroundLight,
       body: SafeArea(
-        child: FutureBuilder<List<Transaction>>(
-          future: _fetchTransactions(),
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _fetchDashboardData(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator(color: DesignSystem.primary));
@@ -87,12 +106,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               );
             }
 
-            final transactions = snapshot.data ?? [];
+            final data = snapshot.data ?? {};
+            final List<Transaction> transactions = data['transactions'] as List<Transaction>? ?? [];
+            final TaxProfile profile = data['profile'] as TaxProfile? ?? TaxProfile.defaultProfile();
+
             if (transactions.isEmpty) {
               return _buildEmptyState();
             }
 
-            return _buildDashboardContent(transactions);
+            return _buildDashboardContent(transactions, profile);
           },
         ),
       ),
@@ -116,9 +138,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildDashboardContent(List<Transaction> transactions) {
+  Widget _buildDashboardContent(List<Transaction> transactions, TaxProfile profile) {
     final now = DateTime.now();
     double totalIncome = 0.0;
+    double totalExpenses = 0.0;
     double thisMonthIncome = 0.0;
     double thisYearIncome = 0.0;
 
@@ -127,23 +150,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             tx.amount.replaceAll(',', '').replaceAll('INR', '').trim(),
           ) ??
           0.0;
-      totalIncome += amt;
+      if (tx.transactionType == 'expense') {
+        totalExpenses += amt;
+      } else {
+        totalIncome += amt;
 
-      final txDate = DateTime.tryParse(tx.date) ?? now;
-      if (txDate.year == now.year && txDate.month == now.month) {
-        thisMonthIncome += amt;
-      }
-      if (txDate.year == now.year) {
-        thisYearIncome += amt;
+        final txDate = DateTime.tryParse(tx.date) ?? now;
+        if (txDate.year == now.year && txDate.month == now.month) {
+          thisMonthIncome += amt;
+        }
+        if (txDate.year == now.year) {
+          thisYearIncome += amt;
+        }
       }
     }
 
-    // Dynamic Tax Projection Heuristic: 44ADA (Freelancers in India can declare 50% as taxable profit)
-    final double presumptiveTaxableProfit = totalIncome * 0.5;
-    // Calculate simple slab tax (assuming flat 10% for basic illustration)
-    final double estimatedTax = presumptiveTaxableProfit > 250000 
-        ? (presumptiveTaxableProfit - 250000) * 0.1 
-        : 0.0;
+    // Dynamic Tax Projection using TaxEngineV2 with expense deduction
+    final taxResult = TaxEngineV2.calculateTax(
+      grossIncome: totalIncome,
+      profile: profile,
+      totalExpenses: totalExpenses,
+    );
+    final double estimatedTax = taxResult.totalTaxDue;
 
     // Monthly Growth Trend (This Month vs Previous Month)
     double lastMonthIncome = 0.0;
@@ -151,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final lastMonthEnd = DateTime(now.year, now.month, 0, 23, 59, 59);
 
     for (final tx in transactions) {
+      if (tx.transactionType == 'expense') continue;
       final txDate = DateTime.tryParse(tx.date) ?? now;
       if ((txDate.isAfter(lastMonthStart) || txDate.isAtSameMomentAs(lastMonthStart)) &&
           txDate.isBefore(lastMonthEnd)) {
@@ -184,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               const SizedBox(height: DesignSystem.lg),
 
               // KPI Premium Cards Grid
-              _buildKpiGrid(totalIncome, thisMonthIncome, thisYearIncome, estimatedTax),
+              _buildKpiGrid(totalIncome, totalExpenses, thisMonthIncome, thisYearIncome, estimatedTax, profile),
               const SizedBox(height: DesignSystem.lg),
 
               // Growth percentage alert
@@ -269,7 +298,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildKpiGrid(double total, double month, double year, double tax) {
+  Widget _buildKpiGrid(double total, double totalExpenses, double month, double year, double tax, TaxProfile profile) {
+    final comparison = TaxEngineV2.compareRegimes(
+      grossIncome: total,
+      profile: profile,
+      totalExpenses: totalExpenses,
+    );
+
+    final otherRegime = profile.taxRegime == 'new' ? 'Old' : 'New';
+    final otherTax = profile.taxRegime == 'new' 
+        ? comparison['oldRegimeResult'].totalTaxDue 
+        : comparison['newRegimeResult'].totalTaxDue;
+
     return Column(
       children: [
         // Giant primary glassmorphism card
@@ -317,21 +357,98 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(width: DesignSystem.md),
             Expanded(
               child: _buildSubKpiCard(
-                'This Year',
-                '₹${year.toStringAsFixed(0)}',
-                Icons.analytics_outlined,
-                DesignSystem.secondary,
+                'Expenses Logged',
+                '₹${totalExpenses.toStringAsFixed(0)}',
+                Icons.trending_down_outlined,
+                DesignSystem.error,
               ),
             ),
           ],
         ),
         const SizedBox(height: DesignSystem.md),
-        _buildSubKpiCard(
-          'Estimated Tax Liability (Presumptive 44ADA)',
-          '₹${tax.toStringAsFixed(2)}',
-          Icons.percent_outlined,
-          DesignSystem.warning,
-          isFullWidth: true,
+        
+        // Interactive Tax Regime Card with Toggle comparison
+        DesignSystem.glassCard(
+          isDark: _isDark,
+          padding: const EdgeInsets.all(DesignSystem.md),
+          borderRadius: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: DesignSystem.warning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.percent_outlined, color: DesignSystem.warning, size: 18),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Tax Liability (${profile.taxRegime.toUpperCase()})',
+                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: DesignSystem.primary),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () async {
+                      final newRegime = profile.taxRegime == 'new' ? 'old' : 'new';
+                      final updated = profile.copyWith(taxRegime: newRegime);
+                      await TaxProfileService.saveProfile(updated);
+                      setState(() {});
+                    },
+                    child: Text(
+                      'Use ${otherRegime} Regime',
+                      style: const TextStyle(fontSize: 11, color: DesignSystem.primary, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '₹${tax.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
+                  Text(
+                    '${otherRegime} Regime: ₹${otherTax.toStringAsFixed(0)}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+              const Divider(color: Colors.white12, height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, color: DesignSystem.primary, size: 14),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      comparison['savings'] > 0
+                          ? 'Recommendation: Use ${comparison['recommendedRegime'].toString().toUpperCase()} Regime to save ₹${comparison['savings'].toStringAsFixed(0)}!'
+                          : 'Both regimes yield the same tax liability.',
+                      style: TextStyle(
+                        color: comparison['recommendedRegime'] == profile.taxRegime ? DesignSystem.success : DesignSystem.warning,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
