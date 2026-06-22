@@ -18,7 +18,7 @@ class InsightsEngine {
     final insights = <DynamicInsight>[];
     if (transactions.isEmpty) return insights;
 
-    final parsedTxs = transactions.map((t) {
+    final parsedTxs = transactions.where((t) => t.transactionType != 'expense').map((t) {
       final double amt = double.tryParse(
             t.amount.replaceAll(',', '').replaceAll('INR', '').trim(),
           ) ??
@@ -101,6 +101,14 @@ class InsightsEngine {
       insights.add(DynamicInsight(
         text: 'Gross income is within ₹7L. You qualify for full tax rebate under Section 87A!',
         type: 'success',
+        category: 'tax',
+      ));
+    }
+
+    if (totalIncome > 1000000) {
+      insights.add(DynamicInsight(
+        text: 'Advance Tax Obligation: Since estimated tax exceeds ₹10,000, you are legally required to make quarterly Advance Tax payments.',
+        type: 'warning',
         category: 'tax',
       ));
     }
