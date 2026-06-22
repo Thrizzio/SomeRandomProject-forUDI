@@ -54,6 +54,9 @@ class FirestoreService {
         'transactionType': transaction.transactionType,
         'date': transaction.date,
         'createdAt': DateTime.now().toIso8601String(),
+        if (transaction.classification != null) 'classification': transaction.classification,
+        if (transaction.confidence != null) 'confidence': transaction.confidence,
+        if (transaction.source != null) 'source': transaction.source,
       });
 
       return docRef.id;
@@ -262,6 +265,9 @@ class FirestoreService {
           'transactionType': transaction.transactionType,
           'date': transaction.date,
           'createdAt': DateTime.now().toIso8601String(),
+          if (transaction.classification != null) 'classification': transaction.classification,
+          if (transaction.confidence != null) 'confidence': transaction.confidence,
+          if (transaction.source != null) 'source': transaction.source,
         });
       }
 
