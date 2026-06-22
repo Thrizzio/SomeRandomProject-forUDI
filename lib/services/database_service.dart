@@ -16,6 +16,7 @@ class DatabaseService {
   // Web fallback storage
   static final List<Transaction> _webTransactions = [];
   static bool _webLoaded = false;
+  static bool useWebFallback = false;
 
   static Future<void> _loadWebTransactions() async {
     try {
@@ -144,7 +145,7 @@ class DatabaseService {
         throw Exception('Cannot insert transaction: no user logged in');
       }
 
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         // Prevent duplicate unique constraint: UNIQUE(amount, sender, date, userEmail)
         final duplicate = _webTransactions.any((t) =>
@@ -185,7 +186,7 @@ class DatabaseService {
   /// Get all transactions for current user
   static Future<List<Transaction>> getAllTransactions() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final list = List<Transaction>.from(_webTransactions);
         list.sort((a, b) => b.date.compareTo(a.date));
@@ -213,7 +214,7 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByType(
       String transactionType) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final list = _webTransactions
             .where((t) => t.transactionType == transactionType)
@@ -243,7 +244,7 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByDateRange(
       DateTime startDate, DateTime endDate) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final startIso = startDate.toIso8601String();
         final endIso = endDate.toIso8601String();
@@ -278,7 +279,7 @@ class DatabaseService {
   /// Get transaction count for current user
   static Future<int> getTransactionCount() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         return _webTransactions.length;
       }
@@ -299,7 +300,7 @@ class DatabaseService {
   /// Get total amount by type for current user
   static Future<double> getTotalAmountByType(String transactionType) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         double sum = 0.0;
         for (final t in _webTransactions) {
@@ -351,7 +352,7 @@ class DatabaseService {
   /// Delete transaction
   static Future<int> deleteTransaction(int id) async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final index = _webTransactions.indexWhere((t) => t.id == id.toString());
         if (index != -1) {
@@ -376,7 +377,7 @@ class DatabaseService {
   /// Clear all transactions
   static Future<int> clearAllTransactions() async {
     try {
-      if (kIsWeb) {
+      if (kIsWeb || useWebFallback) {
         _webTransactions.clear();
         await _saveWebTransactions();
         return 1;
@@ -391,7 +392,7 @@ class DatabaseService {
 
   /// Close database
   static Future<void> closeDatabase() async {
-    if (kIsWeb) return;
+    if (kIsWeb || useWebFallback) return;
     if (_database != null) {
       await _database!.close();
       _database = null;
