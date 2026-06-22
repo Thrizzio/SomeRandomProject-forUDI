@@ -3,6 +3,7 @@ import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import '../models/parsed_transaction.dart';
 import 'app_logger.dart';
+import 'ai_classifier_service.dart';
 
 class BankStatementEngineV2 {
   static const String _tag = 'BankStatementEngineV2';
@@ -118,6 +119,7 @@ class BankStatementEngineV2 {
                            !desc.toLowerCase().contains('spent') && 
                            !amountStr.contains('-');
           final normalizedSource = _normalizeSource(desc);
+          final aiResult = AiClassifierService.classify(line, amount: amountVal.abs(), source: normalizedSource);
 
           transactions.add(ParsedTransaction(
             amount: amountVal.abs(),
@@ -128,8 +130,8 @@ class BankStatementEngineV2 {
             bank: bank,
             rawMessage: line,
             isCredit: isCredit,
-            confidence: 0.8,
-            classification: isCredit ? 'Gig Income' : 'Other',
+            confidence: isCredit ? aiResult.confidence : 1.0,
+            classification: isCredit ? aiResult.classification : 'Other',
             source: normalizedSource,
           ));
         }
@@ -267,7 +269,7 @@ class BankStatementEngineV2 {
 
       // Normalization & classification
       final normalizedSource = _normalizeSource(desc);
-      final classification = _classifyTransaction(desc, amount, normalizedSource, isCredit);
+      final aiResult = AiClassifierService.classify(desc, amount: amount, source: normalizedSource);
 
       return ParsedTransaction(
         amount: amount,
@@ -278,8 +280,8 @@ class BankStatementEngineV2 {
         bank: bank,
         rawMessage: row.join(' | '),
         isCredit: isCredit,
-        confidence: 0.9,
-        classification: classification,
+        confidence: isCredit ? aiResult.confidence : 1.0,
+        classification: isCredit ? aiResult.classification : 'Other',
         source: normalizedSource,
       );
     } catch (e) {
