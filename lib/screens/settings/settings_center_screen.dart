@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import '../../providers/auth_provider.dart';
 import '../../services/database_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/analytics_service.dart';
 import '../../theme/design_system.dart';
 import '../../models/transaction.dart';
+import '../founder/founder_dashboard_screen.dart';
+import '../monetization/monetization_portal_screen.dart';
 
 class SettingsCenterScreen extends StatefulWidget {
   const SettingsCenterScreen({super.key});
@@ -106,6 +110,61 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                       subtitle: 'Store in-app notifications in local history',
                       value: _notificationHistoryEnabled,
                       onChanged: (val) => setState(() => _notificationHistoryEnabled = val),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: DesignSystem.lg),
+
+              // Section: Startup, Monetization & Referrals
+              _buildSectionHeader('Monetization & Startup Growth'),
+              const SizedBox(height: DesignSystem.sm),
+              DesignSystem.glassCard(
+                isDark: _isDark,
+                borderRadius: 18,
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.star_border_outlined, color: Colors.amber),
+                      title: Text('Upgrade to GigTax Pro', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: const Text('Access What-If simulator, local AI tax advisor, and unlimited PDF exports', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const MonetizationPortalScreen()),
+                        );
+                      },
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.rocket_launch_outlined, color: DesignSystem.primary),
+                      title: Text('Founder Command Center', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: const Text('Real-time startup health, user retention cohorts, support tickets, and performance indicators', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const FounderDashboardScreen()),
+                        );
+                      },
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.forum_outlined, color: DesignSystem.success),
+                      title: Text('Submit Support Ticket & Feedback', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: const Text('Rate experience, submit bug reports, feature requests, or contact support', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                      onTap: _showFeedbackDialog,
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.share_outlined, color: DesignSystem.warning),
+                      title: Text('Referral Program & Rewards', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: const Text('Share your referral code and earn ₹500 in Pro credits', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                      onTap: _showReferralDialog,
                     ),
                   ],
                 ),
@@ -228,5 +287,198 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
         const SnackBar(content: Text('Mock transactions imported!')),
       );
     }
+  }
+
+  void _showFeedbackDialog() {
+    int rating = 5;
+    String category = 'experience';
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Submit Feedback / Support Ticket'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            Icons.star,
+                            color: index < rating ? Colors.amber : Colors.grey,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              rating = index + 1;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: category,
+                      decoration: const InputDecoration(labelText: 'Feedback Type', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'experience', child: Text('Rate Experience')),
+                        DropdownMenuItem(value: 'bug', child: Text('Report a Bug')),
+                        DropdownMenuItem(value: 'feature_request', child: Text('Request a Feature')),
+                        DropdownMenuItem(value: 'support', child: Text('Contact CA / Tech Support')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            category = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Subject / Title', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Details / Description', border: OutlineInputBorder()),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (titleController.text.isEmpty || messageController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please fill out all fields.')),
+                      );
+                      return;
+                    }
+                    final auth = context.read<AuthProvider>();
+                    final email = auth.user?.email ?? 'anonymous@gigtax.in';
+                    
+                    await FirebaseFirestore.instance.collection('feedback_tickets').add({
+                      'userEmail': email,
+                      'rating': rating,
+                      'category': category,
+                      'title': titleController.text,
+                      'message': messageController.text,
+                      'status': 'open',
+                      'createdAt': FieldValue.serverTimestamp(),
+                      'response': '',
+                    });
+
+                    await AnalyticsService.logEvent(
+                      eventName: 'feedback_submitted',
+                      category: 'growth',
+                      parameters: {'type': category, 'rating': rating},
+                    );
+
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Thank you! Your ticket has been submitted to the support queue.')),
+                      );
+                    }
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showReferralDialog() {
+    final code = 'GIGTAX_${(context.read<AuthProvider>().user?.email ?? "USER").split("@")[0].toUpperCase()}';
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('referrals')
+              .where('referrerEmail', isEqualTo: context.read<AuthProvider>().user?.email ?? '')
+              .snapshots(),
+          builder: (context, snapshot) {
+            final docs = snapshot.data?.docs ?? [];
+            final referralDoc = docs.isNotEmpty ? docs.first : null;
+            final count = referralDoc != null ? List<String>.from(referralDoc['referredEmails'] ?? []).length : 0;
+            final rewards = referralDoc != null ? referralDoc['totalRewardsEarned'] ?? 0.0 : 0.0;
+
+            return AlertDialog(
+              title: const Text('Referral Program'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Invite fellow freelancers to GigTax and earn ₹500 in Pro credits for every friend who activates their profile!',
+                      style: TextStyle(fontSize: 12, height: 1.3), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: DesignSystem.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(code, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: DesignSystem.primary)),
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 18),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Referral code copied to clipboard!')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildStatsMini('Invites', '$count'),
+                      _buildStatsMini('Rewards', '₹$rewards'),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsMini(String label, String val) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        const SizedBox(height: 4),
+        Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: DesignSystem.success)),
+      ],
+    );
   }
 }

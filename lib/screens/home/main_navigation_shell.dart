@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../analytics/analytics_screen.dart';
 import '../transactions/transaction_center_screen.dart';
 import '../tax/tax_dashboard_screen.dart';
 import '../settings/settings_center_screen.dart';
+import '../auth/onboarding_screen.dart';
 import '../../services/notification_service.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/notification_center_sheet.dart';
 import '../../theme/design_system.dart';
 
@@ -29,14 +32,36 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     const SettingsCenterScreen(),
   ];
 
+  bool _onboardingCompleted = true;
+
   @override
   void initState() {
     super.initState();
     NotificationService.loadNotifications();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed = prefs.getBool('onboarding_completed_v1') ?? false;
+    setState(() {
+      _onboardingCompleted = completed;
+    });
+    await AnalyticsService.logActiveSession();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_onboardingCompleted) {
+      return OnboardingScreen(
+        onComplete: () {
+          setState(() {
+            _onboardingCompleted = true;
+          });
+        },
+      );
+    }
+
     _isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
