@@ -527,14 +527,14 @@ GigTax infers the likely category based on the sender platform (for example, del
 |---|---|---|
 | MVP | SMS parsing, income dashboard, tax estimation | Done |
 | MVP | Reference-ID based deduplication | Done |
-| Phase 2 | AI-based transaction classification (income vs. personal) | Planned |
-| Phase 2 | Expense tracking (platform fees, fuel, data costs) | Planned |
-| Phase 2 | Smart deduplication across bank and platform SMS | Planned |
-| Phase 2 | Old vs. New tax regime comparison toggle | Planned |
-| Phase 3 | Cloud backup and cross-device sync | Planned |
-| Phase 3 | Pre-filled ITR-4 export (JSON / PDF) | Planned |
-| Phase 3 | Hindi and regional language SMS support | Planned |
-| Phase 3 | Configurable raw-message retention and purge controls | Planned |
+| Phase 2 | AI-based transaction classification (income vs. personal) | Done |
+| Phase 2 | Expense tracking (platform fees, fuel, data costs) | Done |
+| Phase 2 | Smart deduplication across bank and platform SMS | Done |
+| Phase 2 | Old vs. New tax regime comparison toggle | Done |
+| Phase 3 | Cloud backup and cross-device sync | Done |
+| Phase 3 | Pre-filled ITR-4 export (JSON / PDF) | Done |
+| Phase 3 | Hindi and regional language SMS support | Done |
+| Phase 3 | Configurable raw-message retention and purge controls | Done |
 
 ---
 
