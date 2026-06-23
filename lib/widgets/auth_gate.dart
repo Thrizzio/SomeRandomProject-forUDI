@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/home/sms_home_screen.dart';
+import 'biometric_lock_wrapper.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -25,7 +26,9 @@ class _AuthGateState extends State<AuthGate> {
         if (auth.loading) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        return auth.isAuthenticated ? const SmsHomeScreen() : const LoginScreen();
+        return auth.isAuthenticated 
+            ? const BiometricLockWrapper(child: SmsHomeScreen()) 
+            : const LoginScreen();
       },
     );
   }

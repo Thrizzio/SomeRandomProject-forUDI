@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/database_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/biometric_service.dart';
 import '../../theme/design_system.dart';
 import '../../models/transaction.dart';
 import '../founder/founder_dashboard_screen.dart';
@@ -21,7 +23,56 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
   bool _smsParsingEnabled = true;
   bool _statementImportsEnabled = true;
   bool _notificationHistoryEnabled = true;
+  bool _biometricLockEnabled = false;
   bool _isDark = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _smsParsingEnabled = prefs.getBool('sms_parsing_enabled') ?? true;
+      _statementImportsEnabled = prefs.getBool('statement_imports_enabled') ?? true;
+      _notificationHistoryEnabled = prefs.getBool('notification_history_enabled') ?? true;
+      _biometricLockEnabled = prefs.getBool('biometric_lock_enabled') ?? false;
+    });
+  }
+
+  Future<void> _toggleBiometric(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('biometric_lock_enabled', val);
+    setState(() {
+      _biometricLockEnabled = val;
+    });
+  }
+
+  Future<void> _toggleSmsParsing(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('sms_parsing_enabled', val);
+    setState(() {
+      _smsParsingEnabled = val;
+    });
+  }
+
+  Future<void> _toggleStatementImports(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('statement_imports_enabled', val);
+    setState(() {
+      _statementImportsEnabled = val;
+    });
+  }
+
+  Future<void> _toggleNotificationHistory(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notification_history_enabled', val);
+    setState(() {
+      _notificationHistoryEnabled = val;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,21 +146,28 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                       title: 'Automatic SMS Parsing',
                       subtitle: 'Process financial receipt SMS in the background',
                       value: _smsParsingEnabled,
-                      onChanged: (val) => setState(() => _smsParsingEnabled = val),
+                      onChanged: _toggleSmsParsing,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     _buildToggleTile(
                       title: 'Automatic Statement Imports',
                       subtitle: 'Allow CSV & text statement conversions',
                       value: _statementImportsEnabled,
-                      onChanged: (val) => setState(() => _statementImportsEnabled = val),
+                      onChanged: _toggleStatementImports,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     _buildToggleTile(
                       title: 'Save Notification History',
                       subtitle: 'Store in-app notifications in local history',
                       value: _notificationHistoryEnabled,
-                      onChanged: (val) => setState(() => _notificationHistoryEnabled = val),
+                      onChanged: _toggleNotificationHistory,
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    _buildToggleTile(
+                      title: 'Biometric Lock Screen',
+                      subtitle: 'Prompt for fingerprint/FaceID on app startup',
+                      value: _biometricLockEnabled,
+                      onChanged: _toggleBiometric,
                     ),
                   ],
                 ),
