@@ -24,7 +24,21 @@ class TaxProvider extends ChangeNotifier {
   double get totalIncome {
     double sum = 0.0;
     for (final tx in _transactions) {
-      if (tx.transactionType.toLowerCase() == 'income' || tx.transactionType.toLowerCase() == 'credit') {
+      if (tx.transactionType.toLowerCase() == 'income' || tx.transactionType.toLowerCase() == 'credit' || tx.transactionType.isEmpty) {
+        final double amt = double.tryParse(
+              tx.amount.replaceAll(',', '').replaceAll('INR', '').replaceAll('₹', '').replaceAll('Rs', '').trim(),
+            ) ??
+            0.0;
+        sum += amt;
+      }
+    }
+    return sum;
+  }
+
+  double get totalExpenses {
+    double sum = 0.0;
+    for (final tx in _transactions) {
+      if (tx.transactionType.toLowerCase() == 'expense' || tx.transactionType.toLowerCase() == 'debit') {
         final double amt = double.tryParse(
               tx.amount.replaceAll(',', '').replaceAll('INR', '').replaceAll('₹', '').replaceAll('Rs', '').trim(),
             ) ??
@@ -88,6 +102,7 @@ class TaxProvider extends ChangeNotifier {
     return TaxEngineV2.calculateTax(
       grossIncome: totalIncome,
       profile: _profile,
+      totalExpenses: totalExpenses,
     );
   }
 
@@ -96,6 +111,7 @@ class TaxProvider extends ChangeNotifier {
     return TaxEngineV2.compareRegimes(
       grossIncome: totalIncome,
       profile: _profile,
+      totalExpenses: totalExpenses,
     );
   }
 
