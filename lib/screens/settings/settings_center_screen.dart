@@ -113,10 +113,19 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                     icon: Icon(Icons.language, color: DesignSystem.primary),
                   ),
                   dropdownColor: _isDark ? DesignSystem.backgroundDark : Colors.white,
-                  items: const [
-                    DropdownMenuItem(value: 'en', child: Text('English', style: TextStyle(color: DesignSystem.primary, fontWeight: FontWeight.bold))),
-                    DropdownMenuItem(value: 'hi', child: Text('हिन्दी (Hindi)', style: TextStyle(color: DesignSystem.primary, fontWeight: FontWeight.bold))),
-                  ],
+                  items: LanguageProvider.supportedLocales.entries.map((e) {
+                    return DropdownMenuItem<String>(
+                      value: e.key,
+                      child: Text(
+                        e.value,
+                        style: const TextStyle(
+                          color: DesignSystem.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (val) {
                     if (val != null) {
                       langProv.setLanguage(val);

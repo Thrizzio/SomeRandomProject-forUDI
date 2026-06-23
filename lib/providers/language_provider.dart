@@ -2,6 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LanguageProvider extends ChangeNotifier {
+  static const Map<String, String> supportedLocales = {
+    'en': 'English',
+    'hi': 'हिन्दी (Hindi)',
+    'as': 'অসমীয়া (Assamese)',
+    'bn': 'বাংলা (Bengali)',
+    'brx': 'बरो (Bodo)',
+    'doi': 'डोगरी (Dogri)',
+    'gu': 'ગુજરાતી (Gujarati)',
+    'kn': 'ಕನ್ನಡ (Kannada)',
+    'ks': 'کٲشূর (Kashmiri)',
+    'kok': 'कोंकणी (Konkani)',
+    'mai': 'मैथिली (Maithili)',
+    'ml': 'മലയാളം (Malayalam)',
+    'mni': 'মৈতৈলোন (Manipuri)',
+    'mr': 'मराठी (Marathi)',
+    'ne': 'नेपाली (Nepali)',
+    'or': 'ଓଡ଼ିଆ (Odia)',
+    'pa': 'ਪੰਜਾਬੀ (Punjabi)',
+    'sa': 'संस्कृतम् (Sanskrit)',
+    'sat': 'ᱥᱟᱱᱛᱟᱲᱤ (Santali)',
+    'sd': 'سنڌي (Sindhi)',
+    'ta': 'தமிழ் (Tamil)',
+    'te': 'తెలుగు (Telugu)',
+    'ur': 'اردو (Urdu)',
+  };
+
   String _currentLocale = 'en';
 
   String get currentLocale => _currentLocale;
