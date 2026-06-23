@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/language_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../analytics/analytics_screen.dart';
 import '../transactions/transaction_center_screen.dart';
@@ -64,6 +65,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     _isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
+    final langProv = context.watch<LanguageProvider>();
     final user = auth.user;
     final initials = _getInitials(user?.email ?? '');
 
@@ -84,7 +86,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
             const SizedBox(width: 8),
             Text(
-              'GigTax',
+              langProv.translate('app_title'),
               style: TextStyle(
                 color: _isDark ? Colors.white : Colors.black87,
                 fontWeight: FontWeight.w900,
@@ -174,12 +176,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           unselectedItemColor: Colors.grey,
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.analytics_outlined), activeIcon: Icon(Icons.analytics), label: 'Analytics'),
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Receipts'),
-            BottomNavigationBarItem(icon: Icon(Icons.percent_outlined), activeIcon: Icon(Icons.percent), label: 'Tax'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings), label: 'Settings'),
+          items: [
+            BottomNavigationBarItem(icon: const Icon(Icons.dashboard_outlined), activeIcon: const Icon(Icons.dashboard), label: langProv.translate('nav_home')),
+            BottomNavigationBarItem(icon: const Icon(Icons.analytics_outlined), activeIcon: const Icon(Icons.analytics), label: langProv.translate('nav_analytics')),
+            BottomNavigationBarItem(icon: const Icon(Icons.receipt_long_outlined), activeIcon: const Icon(Icons.receipt_long), label: langProv.translate('nav_receipts')),
+            BottomNavigationBarItem(icon: const Icon(Icons.percent_outlined), activeIcon: const Icon(Icons.percent), label: langProv.translate('nav_tax')),
+            BottomNavigationBarItem(icon: const Icon(Icons.settings_outlined), activeIcon: const Icon(Icons.settings), label: langProv.translate('nav_settings')),
           ],
         ),
       ),

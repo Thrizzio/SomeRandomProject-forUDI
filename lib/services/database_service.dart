@@ -5,6 +5,7 @@ import 'user_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/crypto_helper.dart';
 
 class DatabaseService {
   static const String _dbName = 'sms_transactions.db';
@@ -17,6 +18,13 @@ class DatabaseService {
   static final List<Transaction> _webTransactions = [];
   static bool _webLoaded = false;
   static bool useWebFallback = false;
+
+  static Transaction _decryptTransaction(Transaction t, String? userEmail) {
+    return t.copyWith(
+      sender: CryptoHelper.decrypt(t.sender, userEmail),
+      messageBody: CryptoHelper.decrypt(t.messageBody, userEmail),
+    );
+  }
 
   static Future<void> _loadWebTransactions() async {
     try {
@@ -147,18 +155,20 @@ class DatabaseService {
 
       if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
-        // Prevent duplicate unique constraint: UNIQUE(amount, sender, date, userEmail)
-        final duplicate = _webTransactions.any((t) =>
-            t.amount == transaction.amount &&
-            t.sender == transaction.sender &&
-            t.date == transaction.date);
+        // Prevent duplicate unique constraint
+        final duplicate = _webTransactions.any((t) {
+          final decSender = CryptoHelper.decrypt(t.sender, userEmail);
+          return t.amount == transaction.amount &&
+              decSender == transaction.sender &&
+              t.date == transaction.date;
+        });
         if (!duplicate) {
           final id = _webTransactions.length + 1;
           final newTx = Transaction(
             id: id.toString(),
             amount: transaction.amount,
-            sender: transaction.sender,
-            messageBody: transaction.messageBody,
+            sender: CryptoHelper.encrypt(transaction.sender, userEmail),
+            messageBody: CryptoHelper.encrypt(transaction.messageBody, userEmail),
             transactionType: transaction.transactionType,
             date: transaction.date,
           );
@@ -173,6 +183,10 @@ class DatabaseService {
       final data = transaction.toJson();
       data['userEmail'] = userEmail;
       
+      // Encrypt sensitive columns
+      data['messageBody'] = CryptoHelper.encrypt(transaction.messageBody, userEmail);
+      data['sender'] = CryptoHelper.encrypt(transaction.sender, userEmail);
+      
       return await db.insert(
         _tableName,
         data,
@@ -186,17 +200,17 @@ class DatabaseService {
   /// Get all transactions for current user
   static Future<List<Transaction>> getAllTransactions() async {
     try {
+      final userEmail = await UserPreferences.getEmail();
+      if (userEmail == null) return [];
+
       if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
-        final list = List<Transaction>.from(_webTransactions);
+        final list = _webTransactions.map((t) => _decryptTransaction(t, userEmail)).toList();
         list.sort((a, b) => b.date.compareTo(a.date));
         return list;
       }
 
       final db = await database;
-      final userEmail = await UserPreferences.getEmail();
-      
-      if (userEmail == null) return [];
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
@@ -204,7 +218,7 @@ class DatabaseService {
         whereArgs: [userEmail],
         orderBy: 'date DESC',
       );
-      return maps.map((map) => Transaction.fromJson(map)).toList();
+      return maps.map((map) => _decryptTransaction(Transaction.fromJson(map), userEmail)).toList();
     } catch (e) {
       rethrow;
     }
@@ -214,9 +228,13 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByType(
       String transactionType) async {
     try {
+      final userEmail = await UserPreferences.getEmail();
+      if (userEmail == null) return [];
+
       if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final list = _webTransactions
+            .map((t) => _decryptTransaction(t, userEmail))
             .where((t) => t.transactionType == transactionType)
             .toList();
         list.sort((a, b) => b.date.compareTo(a.date));
@@ -224,9 +242,6 @@ class DatabaseService {
       }
 
       final db = await database;
-      final userEmail = await UserPreferences.getEmail();
-      
-      if (userEmail == null) return [];
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
@@ -234,7 +249,7 @@ class DatabaseService {
         whereArgs: [transactionType, userEmail],
         orderBy: 'date DESC',
       );
-      return maps.map((map) => Transaction.fromJson(map)).toList();
+      return maps.map((map) => _decryptTransaction(Transaction.fromJson(map), userEmail)).toList();
     } catch (e) {
       rethrow;
     }
@@ -244,21 +259,23 @@ class DatabaseService {
   static Future<List<Transaction>> getTransactionsByDateRange(
       DateTime startDate, DateTime endDate) async {
     try {
+      final userEmail = await UserPreferences.getEmail();
+      if (userEmail == null) return [];
+
       if (kIsWeb || useWebFallback) {
         await _ensureWebLoaded();
         final startIso = startDate.toIso8601String();
         final endIso = endDate.toIso8601String();
-        final list = _webTransactions.where((t) {
-          return t.date.compareTo(startIso) >= 0 && t.date.compareTo(endIso) <= 0;
-        }).toList();
+        final list = _webTransactions
+            .map((t) => _decryptTransaction(t, userEmail))
+            .where((t) {
+              return t.date.compareTo(startIso) >= 0 && t.date.compareTo(endIso) <= 0;
+            }).toList();
         list.sort((a, b) => b.date.compareTo(a.date));
         return list;
       }
 
       final db = await database;
-      final userEmail = await UserPreferences.getEmail();
-      
-      if (userEmail == null) return [];
       
       final List<Map<String, dynamic>> maps = await db.query(
         _tableName,
@@ -270,7 +287,7 @@ class DatabaseService {
         ],
         orderBy: 'date DESC',
       );
-      return maps.map((map) => Transaction.fromJson(map)).toList();
+      return maps.map((map) => _decryptTransaction(Transaction.fromJson(map), userEmail)).toList();
     } catch (e) {
       rethrow;
     }

@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/ui_state_provider.dart';
 import 'providers/tax_provider.dart';
+import 'providers/language_provider.dart';
 import 'services/app_logger.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_auth_service.dart';
@@ -60,6 +61,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<TaxProvider>(
           create: (_) => TaxProvider()..init(),
+        ),
+        ChangeNotifierProvider<LanguageProvider>(
+          create: (_) => LanguageProvider()..init(),
         ),
       ],
       child: MaterialApp(

@@ -11,6 +11,7 @@ import '../../theme/design_system.dart';
 import '../../models/transaction.dart';
 import '../founder/founder_dashboard_screen.dart';
 import '../monetization/monetization_portal_screen.dart';
+import '../../providers/language_provider.dart';
 
 class SettingsCenterScreen extends StatefulWidget {
   const SettingsCenterScreen({super.key});
@@ -78,6 +79,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
   Widget build(BuildContext context) {
     _isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
+    final langProv = context.watch<LanguageProvider>();
     final user = auth.user;
 
     return Scaffold(
@@ -90,7 +92,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
             children: [
               // Screen Title
               Text(
-                'Settings Center',
+                langProv.translate('settings_title'),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: _isDark ? Colors.white : Colors.black87,
@@ -98,8 +100,34 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
               ),
               const SizedBox(height: DesignSystem.lg),
 
+              // Section: Language Selection
+              _buildSectionHeader('App Language / भाषा'),
+              const SizedBox(height: DesignSystem.sm),
+              DesignSystem.glassCard(
+                isDark: _isDark,
+                borderRadius: 18,
+                child: DropdownButtonFormField<String>(
+                  value: langProv.currentLocale,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    icon: Icon(Icons.language, color: DesignSystem.primary),
+                  ),
+                  dropdownColor: _isDark ? DesignSystem.backgroundDark : Colors.white,
+                  items: const [
+                    DropdownMenuItem(value: 'en', child: Text('English', style: TextStyle(color: DesignSystem.primary, fontWeight: FontWeight.bold))),
+                    DropdownMenuItem(value: 'hi', child: Text('हिन्दी (Hindi)', style: TextStyle(color: DesignSystem.primary, fontWeight: FontWeight.bold))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      langProv.setLanguage(val);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: DesignSystem.lg),
+
               // Section: Account Profile
-              _buildSectionHeader('Account Info'),
+              _buildSectionHeader(langProv.translate('settings_account_info')),
               const SizedBox(height: DesignSystem.sm),
               DesignSystem.glassCard(
                 isDark: _isDark,
@@ -122,7 +150,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                       fontSize: 15,
                     ),
                   ),
-                  subtitle: const Text('Verified Member', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  subtitle: Text(langProv.translate('settings_member'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                   trailing: IconButton(
                     icon: const Icon(Icons.logout, color: DesignSystem.error),
                     onPressed: () async {
@@ -134,7 +162,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
               const SizedBox(height: DesignSystem.lg),
 
               // Section: Preferences Toggles
-              _buildSectionHeader('System & Toggles'),
+              _buildSectionHeader(langProv.translate('settings_system_toggles')),
               const SizedBox(height: DesignSystem.sm),
               DesignSystem.glassCard(
                 isDark: _isDark,
@@ -143,29 +171,29 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                 child: Column(
                   children: [
                     _buildToggleTile(
-                      title: 'Automatic SMS Parsing',
-                      subtitle: 'Process financial receipt SMS in the background',
+                      title: langProv.translate('settings_sms_title'),
+                      subtitle: langProv.translate('settings_sms_sub'),
                       value: _smsParsingEnabled,
                       onChanged: _toggleSmsParsing,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     _buildToggleTile(
-                      title: 'Automatic Statement Imports',
-                      subtitle: 'Allow CSV & text statement conversions',
+                      title: langProv.translate('settings_imports_title'),
+                      subtitle: langProv.translate('settings_imports_sub'),
                       value: _statementImportsEnabled,
                       onChanged: _toggleStatementImports,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     _buildToggleTile(
-                      title: 'Save Notification History',
-                      subtitle: 'Store in-app notifications in local history',
+                      title: langProv.translate('settings_notif_title'),
+                      subtitle: langProv.translate('settings_notif_sub'),
                       value: _notificationHistoryEnabled,
                       onChanged: _toggleNotificationHistory,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     _buildToggleTile(
-                      title: 'Biometric Lock Screen',
-                      subtitle: 'Prompt for fingerprint/FaceID on app startup',
+                      title: langProv.translate('settings_biometric_title'),
+                      subtitle: langProv.translate('settings_biometric_sub'),
                       value: _biometricLockEnabled,
                       onChanged: _toggleBiometric,
                     ),
@@ -175,7 +203,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
               const SizedBox(height: DesignSystem.lg),
 
               // Section: Startup, Monetization & Referrals
-              _buildSectionHeader('Monetization & Startup Growth'),
+              _buildSectionHeader(langProv.translate('settings_monetization')),
               const SizedBox(height: DesignSystem.sm),
               DesignSystem.glassCard(
                 isDark: _isDark,
@@ -185,8 +213,8 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                   children: [
                     ListTile(
                       leading: const Icon(Icons.star_border_outlined, color: Colors.amber),
-                      title: Text('Upgrade to GigTax Pro', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Access What-If simulator, local AI tax advisor, and unlimited PDF exports', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_upgrade'), style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_upgrade_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 12),
                       onTap: () {
                         Navigator.push(
@@ -198,8 +226,8 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                     const Divider(color: Colors.white10, height: 1),
                     ListTile(
                       leading: const Icon(Icons.rocket_launch_outlined, color: DesignSystem.primary),
-                      title: Text('Founder Command Center', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Real-time startup health, user retention cohorts, support tickets, and performance indicators', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_founder'), style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_founder_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 12),
                       onTap: () {
                         Navigator.push(
@@ -211,16 +239,16 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                     const Divider(color: Colors.white10, height: 1),
                     ListTile(
                       leading: const Icon(Icons.forum_outlined, color: DesignSystem.success),
-                      title: Text('Submit Support Ticket & Feedback', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Rate experience, submit bug reports, feature requests, or contact support', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_support'), style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_support_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 12),
                       onTap: _showFeedbackDialog,
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     ListTile(
                       leading: const Icon(Icons.share_outlined, color: DesignSystem.warning),
-                      title: Text('Referral Program & Rewards', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Share your referral code and earn ₹500 in Pro credits', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_referral'), style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_referral_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 12),
                       onTap: _showReferralDialog,
                     ),
@@ -230,7 +258,7 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
               const SizedBox(height: DesignSystem.lg),
 
               // Section: Data & Resets
-              _buildSectionHeader('Storage & Management'),
+              _buildSectionHeader(langProv.translate('settings_storage')),
               const SizedBox(height: DesignSystem.sm),
               DesignSystem.glassCard(
                 isDark: _isDark,
@@ -239,15 +267,15 @@ class _SettingsCenterScreenState extends State<SettingsCenterScreen> {
                 child: Column(
                   children: [
                     ListTile(
-                      title: const Text('Clear Transaction Logs', style: TextStyle(color: DesignSystem.error, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Wipe out all local and cached transactional records', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_clear_logs'), style: const TextStyle(color: DesignSystem.error, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_clear_logs_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.delete_sweep_outlined, color: DesignSystem.error),
                       onTap: () => _confirmReset(context),
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     ListTile(
-                      title: Text('Import Test Data', style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: const Text('Add 10+ mock transaction receipts for dashboard testing', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      title: Text(langProv.translate('settings_import_mock'), style: TextStyle(color: _isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(langProv.translate('settings_import_mock_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       trailing: const Icon(Icons.input_outlined, color: DesignSystem.primary),
                       onTap: () => _importMockData(context),
                     ),

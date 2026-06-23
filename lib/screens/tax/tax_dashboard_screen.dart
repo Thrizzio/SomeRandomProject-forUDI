@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/tax_provider.dart';
+import '../../providers/language_provider.dart';
 import '../../models/tax_profile.dart';
 import '../../models/transaction.dart';
 import '../../services/report_generator_service.dart';
@@ -802,6 +803,7 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
   Widget _buildReportCenterCard(TaxProvider taxProvider) {
     final user = context.watch<AuthProvider>().user;
     final userEmail = user?.email ?? 'freelancer@gigtax.in';
+    final langProv = context.watch<LanguageProvider>();
 
     return DesignSystem.glassCard(
       isDark: _isDark,
@@ -809,9 +811,9 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Tax Report Center (CA-Ready)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(langProv.translate('tax_report_center'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: DesignSystem.xs),
-          const Text('Download dedicated PDF logs matching your business requirements.', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          Text(langProv.translate('tax_report_sub'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
           const SizedBox(height: DesignSystem.md),
 
           // Dropdown selector
@@ -849,7 +851,7 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
           // Download action
           Center(
             child: DesignSystem.gradientButton(
-              text: 'Generate and Download Report',
+              text: langProv.translate('tax_generate_btn'),
               isLoading: _isGeneratingReport,
               icon: Icons.download_outlined,
               onPressed: () async {
