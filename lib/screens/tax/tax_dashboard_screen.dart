@@ -8,6 +8,7 @@ import '../../models/tax_profile.dart';
 import '../../models/transaction.dart';
 import '../../services/report_generator_service.dart';
 import '../../services/tax_engine_v2.dart';
+import '../../services/itr_json_export_service.dart';
 import '../../theme/design_system.dart';
 
 class TaxDashboardScreen extends StatefulWidget {
@@ -831,6 +832,7 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
                   DropdownMenuItem(value: 'quarterly_tax', child: Text('Quarterly Advance Tax Report', style: TextStyle(fontSize: 12))),
                   DropdownMenuItem(value: 'client_revenue', child: Text('Client Revenue Concentration', style: TextStyle(fontSize: 12))),
                   DropdownMenuItem(value: 'source_revenue', child: Text('UPI & Channel Contribution', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 'itr4_json', child: Text('India ITR-4 JSON Export', style: TextStyle(fontSize: 12))),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -852,26 +854,41 @@ class _TaxDashboardScreenState extends State<TaxDashboardScreen> {
               icon: Icons.download_outlined,
               onPressed: () async {
                 setState(() => _isGeneratingReport = true);
-                final File? report = await ReportGeneratorService.generatePdfReport(
-                  transactions: taxProvider.transactions,
-                  userEmail: userEmail,
-                  totalIncome: taxProvider.totalIncome,
-                  taxableIncome: taxProvider.taxCalculationResult.netTaxableIncome,
-                  taxPayable: taxProvider.taxCalculationResult.totalTaxDue,
-                  totalExpenses: taxProvider.totalExpenses,
-                  reportType: _selectedReportType,
-                  taxProfile: taxProvider.profile,
-                );
+                final bool isJson = _selectedReportType == 'itr4_json';
+                File? report;
+                
+                if (isJson) {
+                  report = await ItrJsonExportService.exportItr4Json(
+                    totalIncome: taxProvider.totalIncome,
+                    totalExpenses: taxProvider.totalExpenses,
+                    profile: taxProvider.profile,
+                  );
+                } else {
+                  report = await ReportGeneratorService.generatePdfReport(
+                    transactions: taxProvider.transactions,
+                    userEmail: userEmail,
+                    totalIncome: taxProvider.totalIncome,
+                    taxableIncome: taxProvider.taxCalculationResult.netTaxableIncome,
+                    taxPayable: taxProvider.taxCalculationResult.totalTaxDue,
+                    totalExpenses: taxProvider.totalExpenses,
+                    reportType: _selectedReportType,
+                    taxProfile: taxProvider.profile,
+                  );
+                }
                 
                 await taxProvider.markReportGenerated();
                 setState(() => _isGeneratingReport = false);
 
                 if (report != null) {
-                  await ReportGeneratorService.shareReport(report);
+                  if (isJson) {
+                    // JSON Export Service already shares the file internally
+                  } else {
+                    await ReportGeneratorService.shareReport(report);
+                  }
                 } else if (kIsWeb) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Report downloaded successfully!')),
+                      SnackBar(content: Text(isJson ? 'ITR-4 JSON downloaded successfully!' : 'Report downloaded successfully!')),
                     );
                   }
                 } else {

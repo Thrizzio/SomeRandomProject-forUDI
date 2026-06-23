@@ -1,7 +1,7 @@
 import 'dart:html' as html;
 
-Future<void> downloadFileWeb(List<int> bytes, String fileName) async {
-  final blob = html.Blob([bytes], 'application/pdf');
+Future<void> downloadFileWeb(List<int> bytes, String fileName, [String mimeType = 'application/pdf']) async {
+  final blob = html.Blob([bytes], mimeType);
   final url = html.Url.createObjectUrlFromBlob(blob);
   final anchor = html.AnchorElement(href: url)
     ..setAttribute("download", fileName)
