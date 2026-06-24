@@ -657,7 +657,7 @@ class LanguageProvider extends ChangeNotifier {
       'settings_notif_title': 'ਸੂਚਨਾ ਇਤਿਹਾਸ ਸੁਰੱਖਿਅਤ ਕਰੋ',
       'settings_notif_sub': 'ਇਨ-ਐਪ ਸੂਚਨਾਵਾਂ ਨੂੰ ਸਥਾਨਕ ਇਤਿਹਾਸ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ',
       'settings_biometric_title': 'ਬਾਇਓਮੀਟ੍ਰਿਕ ਲਾਕ ਸਕ੍ਰੀਨ',
-      'settings_biometric_sub': 'ਐਪ ਸ਼ੁਰੂ ਹੋਣ 'ਤੇ ਫਿੰਗਰਪ੍ਰਿੰਟ/ਫੇਸ ਆਈਡੀ ਮੰਗੋ',
+      'settings_biometric_sub': "ਐਪ ਸ਼ੁਰੂ ਹੋਣ 'ਤੇ ਫਿੰਗਰਪ੍ਰਿੰਟ/ਫੇਸ ਆਈਡੀ ਮੰਗੋ",
       'settings_monetization': 'ਮੋਨੇਟਾਈਜ਼ੇਸ਼ਨ ਅਤੇ ਸਟਾਰਟਅੱਪ ਵਿਕਾਸ',
       'settings_upgrade': 'ਗਿਗਟੈਕਸ ਪ੍ਰੋ ਵਿੱਚ ਅਪਗ੍ਰੇਡ ਕਰੋ',
       'settings_upgrade_sub': 'ਵੌਟ-ਇਫ਼ ਸਿਮੂਲੇਟਰ, ਸਥਾਨਕ ਏਆਈ ਟੈਕਸ ਸਲਾਹਕਾਰ ਅਤੇ ਅਸੀਮਤ ਪੀਡੀਐਫ ਪ੍ਰਾਪਤ ਕਰੋ',

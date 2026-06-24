@@ -38,5 +38,31 @@ void main() {
       expect(notified, true);
       expect(provider.translate('nav_home'), 'होम');
     });
+
+    test('All 23 supported locales translate key strings correctly', () async {
+      final provider = LanguageProvider();
+      await provider.init();
+      
+      final locales = [
+        'en', 'hi', 'as', 'bn', 'brx', 'doi', 'gu', 'kn', 'ks', 'kok',
+        'mai', 'ml', 'mni', 'mr', 'ne', 'or', 'pa', 'sa', 'sat', 'sd',
+        'ta', 'te', 'ur'
+      ];
+      
+      expect(LanguageProvider.supportedLocales.length, 23);
+      for (final locale in locales) {
+        await provider.setLanguage(locale);
+        expect(provider.currentLocale, locale);
+        
+        // Assert that translation is found and not falling back to key itself (unless they match, which isn't the case for nav_home)
+        final navHomeTrans = provider.translate('nav_home');
+        expect(navHomeTrans, isNot('nav_home'));
+        expect(navHomeTrans.isNotEmpty, true);
+        
+        final appTitleTrans = provider.translate('app_title');
+        expect(appTitleTrans, isNot('app_title'));
+        expect(appTitleTrans.isNotEmpty, true);
+      }
+    });
   });
 }
